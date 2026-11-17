@@ -100,6 +100,15 @@
     padding:1px 5px;font-family:ui-monospace,Consolas,monospace;font-size:12px;color:var(--accent)}
   .modal .bd .sig{margin-top:18px;padding-top:12px;border-top:1px solid var(--line);
     color:var(--fg3);font-size:12px;text-align:right}
+  /* 首次免责确认：勾选栏固定在底部，正文再长也不用滚到底才看得见按钮 */
+  .modal .ack{padding:12px 20px 16px;border-top:1px solid var(--line);
+    display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .modal .ack label{display:flex;align-items:center;gap:8px;font-size:13px;
+    color:var(--fg2);cursor:pointer;user-select:none;line-height:1.5}
+  .modal .ack input[type=checkbox]{width:15px;height:15px;margin:0;cursor:pointer;
+    accent-color:var(--accent);flex:none}
+  .modal .ack .sp{flex:1}
+  .modal .ack .btn[disabled]{opacity:.45;cursor:not-allowed}
   .btn{background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:6px;
     padding:5px 11px;cursor:pointer;font-size:13px;font-family:inherit;transition:.12s;white-space:nowrap}
   .btn:hover{background:#2c3140;border-color:#3d4353}
@@ -660,6 +669,24 @@
     <div class="bd" id="bd-about"></div>
   </div>
 </div>
+<!-- ============ 首次打开：必须明确点「同意」才进主界面 ============
+     免责声明只挂在菜单里，用户不点就永远看不到；真出事时，"使用本程序
+     即表示接受"这句话没有证明力 —— 因为他完全可以声称没点开过。
+     这一层把提示义务摆到台面上：进来先看到，勾了才能往下走。
+     × 按钮故意不给，点遮罩也关不掉 —— 唯一的出口是勾选 + 同意。 -->
+<div class="modal" id="mo-ack">
+  <div class="box">
+    <div class="hd"><h2 data-i18n="ackTitle">免责与使用条款</h2></div>
+    <div class="bd" id="bd-ack"></div>
+    <div class="ack">
+      <label><input type="checkbox" id="ackChk">
+        <span data-i18n="ackChk">我已阅读并理解上述条款，同意自行承担维修作业的风险</span></label>
+      <span class="sp"></span>
+      <button class="btn primary" id="ackGo" disabled
+              data-i18n="ackGo">同意并继续</button>
+    </div>
+  </div>
+</div>
 <!-- ============ 手机上打开：局域网地址 + 二维码 ============
      板子文件在电脑上，人在板子旁边（手上只有手机）。这扇门把两件事连起来：
      二维码让手机一步进来，进来之后手机可以直接拍板/选文件上传到电脑解析。 -->
@@ -703,6 +730,9 @@
 const L = {
 zh:{
   menuHelp:"使用说明", menuDisc:"免责声明", menuAbout:"关于",
+  ackTitle:"免责与使用条款",
+  ackChk:"我已阅读并理解上述条款，同意自行承担维修作业的风险",
+  ackGo:"同意并继续",
   brandName:"铜迹", brandSub:"TraceWisp",
   notLoaded:"未载入文件",
   tabClose:"关闭这个文件", tabBoards:"板",
@@ -1329,11 +1359,14 @@ zh:{
        未随本许可授予任何名称或商标的使用权（第 7(e) 条）。Fork 出去单独发布
        请换个名字，避免用户误认。</p>
     <h3>版本</h3>
-    <p>v1.25.2　·　Windows 10 / 11，32 位 64 位都支持　·　单文件便携版　·　手机扫码看板</p>
+    <p>v1.25.3　·　Windows 10 / 11，32 位 64 位都支持　·　单文件便携版　·　手机扫码看板</p>
     <div class="sig">© 永远的兰兰　·　Lanlan Eternal</div>`
 },
 en:{
   menuHelp:"Help", menuDisc:"Disclaimer", menuAbout:"About",
+  ackTitle:"Disclaimer and Terms of Use",
+  ackChk:"I have read and understood the terms above and accept the risks of repair work",
+  ackGo:"Agree and continue",
   brandName:"TraceWisp", brandSub:"PCB Viewer",
   notLoaded:"No file loaded",
   tabClose:"Close this file", tabBoards:" boards",
@@ -2002,7 +2035,7 @@ en:{
     <p class="dim">This licence grants rights to the code only. The names "TraceWisp" and "铜迹" and the icons come with no name or trademark licence (§7(e)). Please pick
        a different name if you fork and publish separately.</p>
     <h3>Version</h3>
-    <p>v1.25.2　·　Windows 10 / 11, 32-bit and 64-bit　·　portable single file　·　phone via QR</p>
+    <p>v1.25.3　·　Windows 10 / 11, 32-bit and 64-bit　·　portable single file　·　phone via QR</p>
     <div class="sig">© Lanlan Eternal　·　永远的兰兰</div>`
 }
 };
@@ -2042,6 +2075,9 @@ function applyLang(){
     T(window.__DESKTOP__ ? "hintHome" : (isWebMode() ? "hintWeb" : "hintHtml"));
   document.getElementById("bd-help").innerHTML = T("helpHtml");
   document.getElementById("bd-disc").innerHTML = T("discHtml");
+  const ackBd=document.getElementById("bd-ack");
+  if(ackBd && document.getElementById("mo-ack").classList.contains("show"))
+    ackBd.innerHTML = T("discHtml");
   document.getElementById("bd-about").innerHTML = T("aboutHtml");
   applyTitle();
   if(B){ refreshFileLine(); buildLayers(); }
@@ -10765,7 +10801,7 @@ function zoomAt(sx,sy,k){
 }
 
 /* ---------- 弹窗：使用说明 / 免责声明 / 关于 / 手机上打开 ---------- */
-const MODALS=["help","disc","about","phone"];
+const MODALS=["help","disc","about","phone","ack"];
 function openModal(name){
   MODALS.forEach(n=>{
     const el=document.getElementById("mo-"+n);
@@ -10775,7 +10811,12 @@ function openModal(name){
 function closeModals(){
   MODALS.forEach(n=>{
     const el=document.getElementById("mo-"+n);
-    if(el) el.classList.remove("show");
+    if(!el) return;
+    /* 首次免责确认没点「同意」之前，Esc 和别的路径都别放它走。
+       判据放在 DOM 上（data-ok）而不用 let 变量 —— 变量声明在这段
+       之后，用它就会踩 TDZ，v1.25 那次的「只开一半」就是 TDZ。 */
+    if(n==="ack" && el.classList.contains("show") && el.dataset.ok!=="1") return;
+    el.classList.remove("show");
   });
 }
 function anyModalOpen(){
@@ -10791,9 +10832,74 @@ document.querySelectorAll("[data-close]").forEach(b=>{
   b.onclick=closeModals;
 });
 document.querySelectorAll(".modal").forEach(m=>{
-  // 点遮罩空白处关闭（点内容框不关）
+  // 点遮罩空白处关闭（点内容框不关）；首次免责那层不认这一手
+  if(m.id==="mo-ack") return;
   m.addEventListener("mousedown",e=>{ if(e.target===m) closeModals(); });
 });
+
+/* ================== 免责确认：第一次打开必须明确同意 ==================
+   免责声明原先只挂在菜单里，用户不点就永远看不到 —— 而真出事时，
+   "使用本程序即表示你已阅读并接受"这句话几乎没有证明力。这一层把
+   提示义务落到台面上：进来先看到全文，勾了才能进主界面。
+
+   存在哪儿分两条路，不能混：
+     · exe：用 Edge --app 打开 127.0.0.1 上的随机端口，origin 每次都变
+       （实测三次启动 11547 / 11656 / 11769），localStorage 每次都是空的，
+       拿它记"已同意"等于每次开程序都弹一遍。只能落到
+       %LOCALAPPDATA%\CopperLens\ack.json，走本机服务的 /api/ack。
+     · 网页版：没有那个服务，用 localStorage。
+   改了免责正文就把 DISC_VER 加一，两条路上的人都会被再问一次。 */
+const DISC_VER="1";
+const ACK_KEY="tracewisp.discAck";
+
+function ackHasApi(){
+  return !!window.__DESKTOP__ && typeof apiUrl==="function";
+}
+function ackRead(){
+  if(ackHasApi()){
+    return fetch(apiUrl("/api/ack")).then(r=>r.json())
+      .then(j=>({acked:String((j&&j.acked)||"")}))
+      .catch(()=>({acked:""}));        // 读不到就当没同意过，宁可多弹一次
+  }
+  let v=""; try{ v=localStorage.getItem(ACK_KEY)||""; }catch(_){}
+  return Promise.resolve({acked:v});
+}
+function ackWrite(){
+  if(ackHasApi()){
+    return fetch(apiUrl("/api/ack","ver="+encodeURIComponent(DISC_VER)),
+                 {method:"POST"}).then(r=>r.json())
+      .catch(()=>({ok:false}));
+  }
+  try{ localStorage.setItem(ACK_KEY,DISC_VER); }catch(_){}
+  return Promise.resolve({ok:true});
+}
+function ackShow(){
+  const bd=document.getElementById("bd-ack");
+  const mo=document.getElementById("mo-ack");
+  if(bd) bd.innerHTML=T("discHtml");     // 正文只有一份，跟菜单里那份同源
+  const chk=document.getElementById("ackChk");
+  const go=document.getElementById("ackGo");
+  if(mo) delete mo.dataset.ok;           // 每次重开都要重新勾
+  if(chk&&go){
+    chk.checked=false;
+    go.disabled=true;
+    chk.onchange=function(){ go.disabled=!chk.checked; };
+    go.onclick=function(){
+      go.disabled=true;
+      ackWrite().then(function(){
+        if(mo){ mo.dataset.ok="1"; mo.classList.remove("show"); }
+      });
+    };
+  }
+  if(mo) mo.classList.add("show");
+  if(bd) bd.scrollTop=0;
+}
+function ackInit(){
+  if(window.__REMOTE__) return;          // 手机上只是看板，不必再确认一遍
+  ackRead().then(function(j){
+    if(j.acked!==DISC_VER) ackShow();
+  });
+}
 
 /* ================== 手机上打开：局域网地址 + 二维码 ==================
    板子文件在电脑上，人蹲在板子旁边、手上只有手机 —— 这一步把两头接上。
@@ -12072,6 +12178,7 @@ try{
   else if(!/^zh/i.test(navigator.language||"")) lang="en";
 }catch(_){}
 applyLang();
+ackInit();          // 语言定下来之后再问，英文系统不会先闪一段中文
 
 /* ===================== 多板切换（DDB 里有好几块板时） ===================== */
 let BOARDS=[];

@@ -114,6 +114,50 @@
 （越靠边越快，松手就停）；放大后**左上角缩略图**里的黄框是当前视野，点一下跳过去；
 板上**右键写一句话**就是一条标记，按板子存档。
 
+## v1.25.3 免责从「挂在菜单里」变成「进来先看到」
+
+**格式、解析、渲染一行没动。** 这一版只改一件事：第一次打开必须先读免责、点同意。
+
+### 为什么非改不可
+
+免责声明原来只挂在顶部菜单里。用户不点那个按钮，就永远看不到；而真出事时，
+那句「使用本程序即表示你已阅读并接受」几乎没有证明力 —— 他可以声称从没点开过，
+这边也拿不出任何证据。可这个软件是照着图下探头、给板子通电用的，风险不是纸面上的。
+
+现在：**首次打开弹出完整免责**（就是菜单里那份，同一份正文，不存在两份文案对不上的问题），
+勾选「我已阅读并理解」之后按钮才从灰变亮。关闭途径全部封死 —— 没有 ×、点遮罩不关、
+按 `Esc` 不关，唯一的出口是「同意并继续」。同意一次就记下来，之后不再打扰；
+菜单里照旧随时能翻。
+
+### 一个必须踩过的坑：exe 里的 localStorage 是空的
+
+最初想用 `localStorage` 记「已同意」。实测发现不行 —— exe 是用 Edge `--app` 打开
+`127.0.0.1` 上**随机端口**的页面，连着启动三次，端口分别是 `11547 / 11656 / 11769`。
+浏览器按 origin 隔离，**每次都是一个新站点，`localStorage` 每次都是空的**。
+照这个写，等于用户每次开程序都要点一遍同意。
+
+所以 exe 侧落在 `%LOCALAPPDATA%\CopperLens\ack.json`（只存一个版本号和时间），
+走本机服务的 `/api/ack`（GET 读、POST 写，跟其他接口一样要令牌）；
+网页版没有那个服务，才用 `localStorage`。
+
+版本号还有个用处：**将来改了免责正文，把它加一，两条路上的人都会被重新问一次**，
+不用指望用户自己想起来去菜单里翻。
+
+### 本版实测
+
+| 环境 | 项数 | 结果 |
+|---|---|---|
+| 网页版（真页面，headless Chrome） | 17 | 全过：弹窗出现、9 段正文齐全、无 ×、按钮初始禁用、勾选后可用、同意后关闭并记住、刷新不再弹、菜单那份照常开关、英文文案正确 |
+| exe 前端分支（注入 `__DESKTOP__` + 假本机服务） | 10 | 全过：确实走 `fetch`、一次都没碰 `localStorage`、POST 带 `ver=1`、重开不再弹 |
+| Python 侧文件读写 | 8 | 全过：写入 / 覆盖 / 读回 / 内容损坏时返回空串而不抛异常 |
+| 真 exe 两次启动 | 2 | 无 `ack.json` 时弹出、有时直进主界面（截图逐张核对） |
+| 真服务 `/api/ack` | 8 | 全过：GET 返回空、POST 落盘、读回、改版本号、无令牌 403 |
+
+「关不关得掉」单独验了三条：点遮罩、按 `Esc`、找 × 按钮 —— 都关不掉。
+
+顺带说一句：这一版**没有**顺手改「板上标记」在 exe 里丢失的问题（同一个 origin 原因），
+那是功能缺失不是提示缺失，留给下一版专门做，见《已知限制》。
+
 ## v1.25.2 真样本到了：三个格式「文件在手里却认不出」
 
 **格式清单一个字没动，十二家照旧封版。** 这一版改的全是入口。
@@ -799,8 +843,12 @@ Gerber 是**制造文件**，不是设计文件：它只描述形状，不写哪
 - **只读**：只读文件，**绝不修改、覆盖、删除**你的原始文件。
 - **不联网**：显示内核跑在本机回环（`127.0.0.1` 随机端口 + 一次性令牌），
   **不监听网卡、不上外网、不写注册表**。在线版也是纯前端，文件不出浏览器。
-- **不留痕**：只有两处写盘 —— 临时目录（读 `.ddb` 时的中转文件，退出即清）和
-  首页「最近打开」的一份本地清单（只存路径、板名、时间，纯本地）。
+- **不留痕**：只有三处写盘，全在临时目录与 `%LOCALAPPDATA%\CopperLens\` 里：
+  ① 临时目录的中转文件（读 `.ddb` 时用，退出即清）；
+  ② `recent.json` —— 首页「最近打开」的清单（只存路径、板名、时间）；
+  ③ `ack.json` —— 只记「免责声明读过哪个版本」，一个版本号加一行时间。
+  三份都不含文件内容、不含个人身份，删掉任何一份都不影响程序使用（`ack.json` 删了
+  等于下次再同意一遍）。
 - **无第三方库**：绘图与解析全部自己实现，没有运行时依赖注入。
 
 ## 兼容性
@@ -826,6 +874,11 @@ Gerber 是**制造文件**，不是设计文件：它只描述形状，不写哪
 - **立创专业版的覆铜（POUR / POURED）不展开**：文件里存的是归一化坐标，跟板坐标不是一个原点，
   硬画整片错位，所以内层电地平面看起来是空的 + 一片过孔 —— 这是实情，不是漏画。
 - **立创专业版的规则区（REGION / 禁止布线区）不画**：它同样用局部坐标，画出来会有一大块游离图形。
+- **exe 版「板上标记」关掉就丢**（v1.25.3 已确认，待修）：标记存在浏览器的
+  `localStorage` 里，而 exe 每次启动都是 `127.0.0.1` 上的随机端口，origin 跟着变，
+  重启后读不回来。网页版用固定域名，不受影响。修法与免责记录同一套（落
+  `%LOCALAPPDATA%\CopperLens\`），但要把 `loadRecs` 从同步改成异步，牵动抽屉渲染，
+  单独排一版做，不跟免责确认混在一起。
 - 无代码签名，SmartScreen 可能提示"未知发布者"。
 
 ## 重新打包
@@ -962,6 +1015,10 @@ GPL-2.0 §3(b) 的三年书面源码要约写在 `第三方组件与许可.txt` 
 （不得擅自使用他人有一定影响的商品名称），举证门槛比注册商标高。
 
 ### 免责
+
+**自 v1.25.3 起，第一次打开会先弹出完整免责，勾选同意才能进主界面** ——
+在此之前它只挂在菜单里，用户不点就永远看不到，那句「使用即表示接受」其实站不住。
+缘由与实测见 [CHANGELOG](CHANGELOG.md) 的 v1.25.3 一节。
 
 程序按原样提供，不附带任何形式的担保。**它只读** —— 不改你的文件、不联网、不替你
 判断故障。读数面板会告诉你哪里是猜的：照着一份少读了两成的图去下探头、去通电，
@@ -1110,6 +1167,96 @@ Mouse: the wheel zooms **anchored at the pointer**; **drag to the edge of the ca
 view keeps moving that way** (faster the closer you get, stops when you let go); once zoomed
 in, the **mini-map in the top-left** shows your viewport as a yellow box — click to jump;
 **right-click on the board writes a note**, saved per board.
+
+## What's new in v1.25.3 — the disclaimer is in your face now, not buried in a menu
+
+**No format, parser or renderer changed.** One thing only: the first launch makes you read
+the disclaimer and accept it before the main UI appears.
+
+### Why it had to change
+
+The disclaimer used to live only behind a menu button. Whoever never clicked it never saw
+it — and if something goes wrong, "by using this program you accept the terms" proves
+nothing: they can simply say they never opened it, and there is no evidence either way.
+This is a tool people use to put probes on a live board and then power it up. The risk is
+not theoretical.
+
+Now the **first launch shows the full disclaimer** (the very same text as the menu entry —
+one source, so the two copies can never drift apart), and the Agree button stays greyed out
+until the checkbox is ticked. Every other exit is closed: no ×, clicking the backdrop does
+nothing, `Esc` does nothing. The only way on is "Agree and continue". Accept once and it
+stops asking; the menu entry still opens and closes as before.
+
+### The trap: `localStorage` is empty inside the exe
+
+The obvious approach — remember the answer in `localStorage` — does not work here. The exe
+opens its page from a **random port** on `127.0.0.1` through Edge `--app`; three consecutive
+launches gave ports `11547 / 11656 / 11769`. Browsers scope storage by origin, so every
+launch is a **brand-new site with empty `localStorage`**. Written that way, the exe would
+ask for consent on every single start.
+
+So the exe keeps the answer in `%LOCALAPPDATA%\CopperLens\ack.json` — a version string and
+a timestamp, nothing else — reached through the local service at `/api/ack` (GET reads, POST
+writes, token required like every other endpoint). The web version has no such service and
+uses `localStorage`.
+
+The version string earns its keep: **bump it when the disclaimer text changes and everyone
+is asked again**, on both paths, without depending on users to go looking in the menu.
+
+### What was actually tested
+
+| Environment | Checks | Result |
+|---|---|---|
+| Web version (real page, headless Chrome) | 17 | all pass — popup appears, 9 sections present, no ×, button disabled initially, enabled after ticking, closes and remembers, no popup on reload, menu copy still opens and closes, English copy correct |
+| exe front-end branch (injected `__DESKTOP__` + stub local service) | 10 | all pass — really goes through `fetch`, never touches `localStorage`, POST carries `ver=1`, no popup on reopen |
+| Python file helpers | 8 | all pass — write / overwrite / read back / corrupt file returns empty instead of throwing |
+| Real exe, two launches | 2 | popup when `ack.json` is absent, straight to the main UI when present (screenshots checked one by one) |
+| Real `/api/ack` endpoint | 8 | all pass — empty GET, POST writes, read back, version bump, 403 without token |
+
+Dismissal was probed three ways — backdrop click, `Esc`, hunting for an × button — all
+three fail, by design.
+
+One thing this release deliberately does **not** fix: board marks are still lost in the exe
+(same origin reason). That is a missing feature rather than a missing warning, so it gets
+its own release. See *Known limitations*.
+
+## What's new in v1.25.2 — the samples arrived: three formats the picker refused
+
+**The format list did not change.** Twelve, closed. This release touched only the entry
+path: the parsers could already read these files, but the picker threw them away before
+they got there.
+
+| Symptom | Real cause |
+|---|---|
+| PADS `.asc`, Altium `.PcbDoc`, IPC-2581 `.xml`: dropped in, "unrecognised file" | The parsers were fine — asked the page's own sniffers and `looksPads` / `looksAltium` / `looksIpc2581` all matched. The front-door regex was missing the three extensions |
+| Every ODB++ zip: "no copper layers could be read" | The `matrix` and `features` entries inside do not match the Gerber suffix filter, so they were discarded before `parseOdb` ever saw them |
+| Web version: picking a file with Open said "unrecognised", while drag-and-drop worked | `onchange` ran `e.target.value=""` first, and in Chrome that clears the `FileList` too — `openFiles` received zero files |
+| Drill files named `.TXT` could not be selected at all | `accept` and the exe file dialog only listed `.drl` / `.xln` |
+
+The last one is the sneaky one: **drag-and-drop takes a different path**, so nobody ever
+hit it that way.
+
+A 68-file sample pack (29 MB) gave 34 cases: **33 open**. The one failure is 99SE `.ddb`,
+which is by design in a browser. Altium LimeSDR Mini (9.6 MB) → 10,362 objects;
+EasyEDA Pro taishan → 16,036 objects; IPC-2581 tc10 (3.7 MB) → 12,765 objects;
+Gerber rpi_can → 5,350 objects with 106 drilled holes folded into pads; the three ODB++
+variants (flat / mm / wrapped) give identical numbers, which is what proves the unit
+conversion and the directory nesting are right.
+
+## What's new in v1.25.1 — the half-opened window
+
+v1.25 threw `Cannot access 'RECS' before initialization` whenever the exe opened a board:
+the board itself was drawn, but the tabs never rendered and the home hint stayed up.
+**Every board, not an edge case.**
+
+A board embedded in the exe (via `__BOARDS__`) opens during script evaluation, while
+`let RECS` sits thousands of lines further down — a temporal dead zone. The auto-open now
+runs one macrotask later, together with the code that hides the home hint.
+
+Worth remembering for anyone testing this sort of thing: the HTML harness called `openDoc()`
+after an 80 ms delay, which never hits the bug. **Only the path the program actually takes
+counts as tested** — 27 green checks meant nothing once a real double-click arrived through
+a different door.
 
 ## What's new in v1.25
 
@@ -1706,8 +1853,12 @@ Design decisions worth knowing (details in the [CHANGELOG](CHANGELOG.md)):
   port, one-time token). **Nothing listens on a network interface, nothing goes to the
   internet, nothing is written to the registry.** The web version is pure client-side — your
   file never leaves the browser.
-- **Nothing left behind**: only two things touch the disk — a temp file used while parsing a
-  `.ddb` (cleared on exit) and a local recent-files list (path, board name, time only).
+- **Nothing left behind**: three things touch the disk, all in the temp directory and
+  `%LOCALAPPDATA%\CopperLens\`: ① a temp file used while parsing a `.ddb` (cleared on
+  exit); ② `recent.json`, the recent-files list (path, board name, time); ③ `ack.json`,
+  which records only *which version of the disclaimer you read* — one version string and a
+  timestamp. None of them holds file contents or personal identity, and deleting any of
+  them breaks nothing (deleting `ack.json` just means agreeing once more).
 - **No third-party runtime libraries**: parsing and drawing are implemented from scratch.
 
 ## Compatibility
@@ -1734,6 +1885,12 @@ Design decisions worth knowing (details in the [CHANGELOG](CHANGELOG.md)):
   matter for tracing a fault.
 - In older KiCad 4 / 5 files, refdes are often still `REF**` (unannotated); those boards
   have nothing to search for in the parts list.
+- **Board marks are lost in the exe** (confirmed in v1.25.3, fix pending): marks live in
+  the browser's `localStorage`, and the exe opens a random port on `127.0.0.1` every time,
+  so the origin changes and nothing can be read back after a restart. The web version has a
+  fixed origin and is unaffected. The fix is the same mechanism used for the disclaimer
+  record, but it means turning `loadRecs` from synchronous to asynchronous, which ripples
+  into the drawer render — so it gets its own release instead of riding along here.
 - Not code-signed, so SmartScreen may warn about an unknown publisher.
 
 ## Building from source
@@ -1854,6 +2011,11 @@ Anti-Unfair Competition Law (no unauthorised use of another's product name that 
 acquired influence) — a higher evidentiary bar than a registered mark.
 
 ### No warranty
+
+**Since v1.25.3 the full disclaimer is shown on first launch and must be accepted before
+the main UI appears.** Until then it sat behind a menu button that most people never
+clicked, which made "by using this you accept" hard to defend. See the v1.25.3 section of
+the [CHANGELOG](CHANGELOG.md) for the reasoning and the test results.
 
 Provided as is, without warranty of any kind. **It only reads** — it does not change your
 files, does not go online, and does not diagnose faults for you. The readout panel tells

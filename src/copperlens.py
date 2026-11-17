@@ -48,7 +48,7 @@ from ctypes import wintypes
 from pathlib import Path
 
 APP_TITLE = "铜迹 TraceWisp"
-VERSION = "1.25.2"
+VERSION = "1.25.3"
 
 # 认自己窗口时看的标题关键词。改名之前/之后都收，老用户的更新包不会认不到自己的窗口。
 _SELF_TITLES = ("铜迹", "TraceWisp", "CopperLens", "PCB 看板")
@@ -1804,6 +1804,38 @@ def _recent_path():
     return Path(base) / _APPDIR / "recent.json"
 
 
+# ------------------------------------------------------ 免责确认（本机记录）
+# 存在 %LOCALAPPDATA%\CopperLens\ack.json，只有一个免责版本号。
+# 为什么不用 localStorage：exe 每次开的都是 127.0.0.1 上的随机端口，
+# origin 跟着变，localStorage 存不住（实测三次启动变了三次端口）。
+# 版本号由页面传上来；页面那边改了免责正文就加一，用户会被再问一次。
+def _ack_path():
+    base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+    return Path(base) / _APPDIR / "ack.json"
+
+
+def _ack_load():
+    """返回已同意过的免责版本号；从没同意过返回空串。"""
+    try:
+        d = json.loads(_ack_path().read_text(encoding="utf-8"))
+        return str((d or {}).get("disc") or "")
+    except Exception:
+        return ""
+
+
+def _ack_save(ver):
+    try:
+        p = _ack_path()
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(json.dumps({"disc": str(ver),
+                                 "at": time.strftime("%Y-%m-%d %H:%M:%S")},
+                                ensure_ascii=False), encoding="utf-8")
+        return True
+    except Exception as e:
+        log("免责确认写不进去：%r" % e)
+        return False
+
+
 def _load_recent():
     try:
         data = json.loads(_recent_path().read_text(encoding="utf-8"))
@@ -1969,6 +2001,9 @@ def _make_handler(token):
                 if self.remote:
                     return self._json({"items": []})
                 return self._json(_recent_listing())
+            if u.path == "/api/ack":
+                # 手机连进来那侧不弹确认，答案照给（万一以后要用）
+                return self._json({"acked": _ack_load()})
             if u.path == "/api/bye":
                 # sendBeacon 有时走 GET，两个方法都认
                 _bye[0] = time.time()
@@ -1995,6 +2030,12 @@ def _make_handler(token):
             if u.path == "/api/bye":
                 _bye[0] = time.time()
                 return self._json({"ok": True})
+            if u.path == "/api/ack":
+                if self._no_remote():
+                    return
+                q = urllib.parse.parse_qs(u.query)
+                ver = (q.get("ver") or [""])[0]
+                return self._json({"ok": _ack_save(ver)})
             if u.path == "/api/open":
                 if self._no_remote():
                     return

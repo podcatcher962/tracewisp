@@ -558,6 +558,21 @@
     header #fname{padding:1vw 2vw}
     footer{font-size:2.8vw;min-height:7vw;padding:.8vw 2vw;gap:2.4vw}
     .tabs{height:6.6vw;margin:1vw -2vw -1.5vw}
+
+    /* 免责弹窗是手机上第一眼看到的东西，字小就等于让人盲签。
+       「同意并继续」改成整宽大按钮：原来它挤在右下角，拇指不好够。 */
+    .modal .hd{padding:3vw 3.6vw}
+    .modal .hd h2{font-size:4.1vw}
+    .modal .bd{font-size:3.4vw;line-height:1.8;padding:3vw 3.6vw 6vw}
+    /* 正文区是滚动容器，底部留白让"最后一行被切成半截"看着是"还有下文" */
+    .modal .bd p.dim{font-size:3.1vw}
+    .modal .bd h3{font-size:3.5vw;margin:3.4vw 0 1.4vw}
+    .modal .ack{flex-direction:column;align-items:stretch;gap:2.6vw;
+      padding:2.8vw 3.6vw 3.4vw}
+    .modal .ack .sp{display:none}
+    .modal .ack label{font-size:3.35vw;line-height:1.55;gap:2.6vw;align-items:flex-start}
+    .modal .ack input[type=checkbox]{width:5.4vw;height:5.4vw;flex:none;margin-top:.4vw}
+    #ackGo{width:100%;min-height:12vw;font-size:4vw;border-radius:2.6vw}
   }
 </style>
 </head>

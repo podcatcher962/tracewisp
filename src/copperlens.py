@@ -48,7 +48,7 @@ from ctypes import wintypes
 from pathlib import Path
 
 APP_TITLE = "铜迹 TraceWisp"
-VERSION = "1.25.0"
+VERSION = "1.25.1"
 
 # 认自己窗口时看的标题关键词。改名之前/之后都收，老用户的更新包不会认不到自己的窗口。
 _SELF_TITLES = ("铜迹", "TraceWisp", "CopperLens", "PCB 看板")

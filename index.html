@@ -2,13 +2,13 @@
 <!--
   Copyright (C) 2026 永远的兰兰 (Lanlan Eternal)
   SPDX-License-Identifier: GPL-3.0-or-later
-  This file is part of CopperLens. See LICENSE in the repository root.
+  This file is part of TraceWisp (formerly TraceWisp). See LICENSE in the repository root.
 -->
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>PCB 看板 CopperLens — 只读查线</title>
+<title>亮线 TraceWisp — 只读查线</title>
 <style>
   :root{
     --bg:#14161a; --panel:#1c1f26; --panel2:#232733; --line:#313644;
@@ -405,7 +405,7 @@
 <!-- ============ 海报：桌面版启动时先出现，几秒后自动进入首页 ============ -->
 <div class="splash" id="splash">
   <div class="box">
-    <div class="logo">PCB 看板 <em>CopperLens</em></div>
+    <div class="logo">亮线 <em>TraceWisp</em></div>
     <div class="sub">点一下走线，就知道这根线通到哪儿、两头是哪颗元件的哪只脚</div>
     <ul>
       <li><b>查线路</b>点一条走线或焊盘，整条网络亮起来，状态栏写出 U100-4 这样的脚位</li>
@@ -420,7 +420,7 @@
 <div id="app">
   <header>
     <div class="hrow">
-      <div class="brand"><span data-i18n="brandName">PCB 看板</span><em data-i18n="brandSub">CopperLens</em></div>
+      <div class="brand"><span data-i18n="brandName">PCB 看板</span><em data-i18n="brandSub">TraceWisp</em></div>
       <div class="by" data-i18n="author">© 永远的兰兰</div>
       <nav class="menu">
         <button class="mbtn" data-modal="help" data-i18n="menuHelp">使用说明</button>
@@ -590,7 +590,7 @@
 const L = {
 zh:{
   menuHelp:"使用说明", menuDisc:"免责声明", menuAbout:"关于",
-  brandName:"PCB 看板", brandSub:"CopperLens",
+  brandName:"亮线", brandSub:"TraceWisp",
   notLoaded:"未载入文件",
   tabClose:"关闭这个文件", tabBoards:"板",
   tabLimit:"同时最多开 12 个文件，先关掉几个吧。",
@@ -640,7 +640,7 @@ zh:{
   recentGone:"文件不在原处了",
   recentTip:"点一下直接打开，不用再找文件",
   tabOfBoard:"板",
-  ttl:"PCB 看板 CopperLens — 只读查线",
+  ttl:"亮线 TraceWisp — 只读查线",
   author:"© 永远的兰兰",
   navCenter:"回到板子中心", navUp:"上移", navDown:"下移",
   navLeft:"左移", navRight:"右移",
@@ -810,7 +810,7 @@ zh:{
   prNet:n=>n+" 个网络",
   prZoom:p=>"缩放 "+p+"%",
   prTime:s=>"出图 "+s,
-  prFootL:"PCB 看板 CopperLens",
+  prFootL:"亮线 TraceWisp",
   prFootR:"© 永远的兰兰　·　纸上的位号与实物一一对应",
   shotDone:n=>"已存图："+n,
   shotFail:"存图失败：",  layerTitle:"单击开关　双击只看该层",
@@ -869,7 +869,7 @@ zh:{
   multiBoard:"这个文件里有多块板，按修改时间从新到旧排：",
   latest:"★最新",
   hintHome:`<div class="home">
-      <div class="logo">PCB 看板 <em>CopperLens</em></div>
+      <div class="logo">亮线 <em>TraceWisp</em></div>
       <div class="sub">点一下走线，就知道这根线通到哪儿、两头是哪颗元件的哪只脚</div>
       <button class="hbtn" id="hintOpen">打开文件</button>
       <div class="tip2">
@@ -1151,7 +1151,7 @@ zh:{
     <p>读取 .ddb 设计库时调用了 mdbtools（GPL-2.0）中的命令行程式，其许可证随程序一同提供。</p>
     <div class="sig">使用本程序即表示你已阅读并接受上述条款。</div>`,
   aboutHtml:`
-    <h3>PCB 看板 / CopperLens</h3>
+    <h3>亮线 / TraceWisp</h3>
     <p>一个<b>只看不改</b>的线路板查线工具。为产线维修、售后排查这类
        "只想看看这块板子上的线通到哪儿"的场合而做。</p>
     <p>免安装的单文件程序，不联网、不写注册表、不装任何运行库。
@@ -1191,7 +1191,7 @@ zh:{
        全文见仓库根目录的 LICENSE。</p>
     <p>分发时请保留原作者署名「永远的兰兰 / Lanlan Eternal」与项目地址，
        放在关于页、启动画面或 README 顶部即可（GPL-3.0 第 7(b) 条附加条款）。</p>
-    <p class="dim">本许可仅授予代码权利。「CopperLens」「PCB 看板」这两个名称与图标，
+    <p class="dim">本许可仅授予代码权利。「亮线」「TraceWisp」这两个名称与图标，
        未随本许可授予任何名称或商标的使用权（第 7(e) 条）。Fork 出去单独发布
        请换个名字，避免用户误认。</p>
     <h3>版本</h3>
@@ -1200,7 +1200,7 @@ zh:{
 },
 en:{
   menuHelp:"Help", menuDisc:"Disclaimer", menuAbout:"About",
-  brandName:"CopperLens", brandSub:"PCB Viewer",
+  brandName:"TraceWisp", brandSub:"PCB Viewer",
   notLoaded:"No file loaded",
   tabClose:"Close this file", tabBoards:" boards",
   tabLimit:"12 files open is the limit — close one first.",
@@ -1251,7 +1251,7 @@ en:{
   recentGone:"File no longer there",
   recentTip:"Click to open it again",
   tabOfBoard:"board",
-  ttl:"CopperLens — read-only PCB viewer",
+  ttl:"TraceWisp — read-only PCB viewer",
   author:"© Lanlan Eternal",
   navCenter:"Back to board centre", navUp:"Pan up", navDown:"Pan down",
   navLeft:"Pan left", navRight:"Pan right",
@@ -1427,7 +1427,7 @@ en:{
   prNet:n=>n+" nets",
   prZoom:p=>"Zoom "+p+"%",
   prTime:s=>"Plotted "+s,
-  prFootL:"PCB Viewer CopperLens",
+  prFootL:"TraceWisp · PCB Viewer",
   prFootR:"© Lanlan Eternal　·　refdes on paper matches the real board",
   shotDone:n=>"Saved: "+n,
   shotFail:"Save failed: ",  layerTitle:"Click to toggle　double-click to show only this layer",
@@ -1489,7 +1489,7 @@ en:{
   multiBoard:"Several boards in this file, newest first:",
   latest:"★latest",
   hintHome:`<div class="home">
-      <div class="logo">PCB 看板 <em>CopperLens</em></div>
+      <div class="logo">亮线 <em>TraceWisp</em></div>
       <div class="sub">Click a trace and see where it goes — and which pins it lands on.</div>
       <button class="hbtn" id="hintOpen">Open File</button>
       <div class="tip2">
@@ -1802,7 +1802,7 @@ en:{
        is distributed alongside this program.</p>
     <div class="sig">By using this program you accept the terms above.</div>`,
   aboutHtml:`
-    <h3>CopperLens / PCB 看板</h3>
+    <h3>TraceWisp / 亮线</h3>
     <p>A <b>read-only</b> board viewer built for repair benches and after-sales
        troubleshooting — the "I just need to see where this trace goes" kind of work.</p>
     <p>Single portable executable. No install, no network access, no registry writes,
@@ -1843,8 +1843,7 @@ en:{
     <p>Keep the original author credit — 永远的兰兰 / Lanlan Eternal — and the project
        URL when you redistribute: the About box, a splash screen or the top of the README
        will do (GPL-3.0 §7(b) additional term).</p>
-    <p class="dim">This licence grants rights to the code only. The names "CopperLens" and
-       "PCB 看板" and the icons come with no name or trademark licence (§7(e)). Please pick
+    <p class="dim">This licence grants rights to the code only. The names "TraceWisp" and "亮线" and the icons come with no name or trademark licence (§7(e)). Please pick
        a different name if you fork and publish separately.</p>
     <h3>Version</h3>
     <p>v1.24.2　·　Windows 10 / 11, 32-bit and 64-bit　·　portable single file</p>
@@ -11385,7 +11384,7 @@ async function uploadToServer(f){
   }
 }
 /* ---------- 首页「最近打开」 ----------
-   exe 那侧把打开过的文件记在本机（%LOCALAPPDATA%\CopperLens\recent.json），
+   exe 那侧把打开过的文件记在本机（%LOCALAPPDATA%\\CopperLens\recent.json），
    首页把它们列出来，点一下直接再打开 —— 不必每次都去翻文件夹找那个 .ddb。
    只有桌面版有这一步：网页版碰不到本地文件系统。 */
 async function loadRecent(){

@@ -1,4 +1,4 @@
-# 铜迹 TraceWisp v1.24.2
+# 铜迹 TraceWisp v1.25
 
 **PCB 走线查看器**
 
@@ -113,6 +113,68 @@
 鼠标：滚轮**以指针位置为锚点**缩放；**按住左键拖到画布边缘，画面自己往那个方向走**
 （越靠边越快，松手就停）；放大后**左上角缩略图**里的黄框是当前视野，点一下跳过去；
 板上**右键写一句话**就是一条标记，按板子存档。
+
+## v1.25 重点
+
+**不加格式，加看板的姿势。** 十二家格式照旧封版，这一版只解决"人不在电脑前"。
+
+- **触屏手势层**：一指拖、两指捏（锚在中点）、轻点选、双击取消、长按标记。
+  鼠标那条路一行没改 —— 两条路各走各的，台式机手感一个字节都不变。
+- **窄屏换密度**：≤820px 自动切成手机布局（滑出侧栏 + 单行横滑工具条 + 底部五个大按钮）。
+- **扫码看板**：桌面版右上角 **📱 手机** → 二维码 → 手机扫进来看同一块板。
+  二维码是**自己算的**（`copperlens.py` 里约 300 行零依赖编码器，字节模式、版本 1~10、
+  四级纠错），页面只画方块，不引第三方库。正确性用 OpenCV 的 QRCodeDetector 独立解码验过：
+  6 组内容 × 4 个级别共 24 个矩阵全部解回原文（含中文），最后还从**运行中页面的截图**里
+  把码解了一遍。
+- **口令与边界**：电脑上是 32 位长口令，手机走 `/p/<8 位短口令>`；同一台机器一分钟输错
+  30 次限流 60 秒，但**口令对了不受影响**（邻居乱猜不该把自己锁在外面）；手机点不到电脑的
+  文件对话框与最近记录（403）；手机的心跳不推进主进程的存活时间。
+
+### 本版实测
+
+无头 Edge + CDP 驱动真页面，不是"看了一遍"：
+
+- **页面 27 项**（桌面 5 / 手机布局 7 / 手势 6 / 底栏与弹窗 6 / 二维码 1 全部通过）：
+  画布 1230×756 与 390×722、拖动位移 (65,-80) 且不改缩放、捏放 2.27×／捏回 0.44×、
+  轻点选中一条网络、双击清除、长按出标记框、图层滑出时**不会把右侧清单抽屉一起带出来**、
+  通不通与量距的按钮状态与顶栏同步、**对截图做 OpenCV 解码得到的就是那条地址**
+- **服务端 18 项**：长短口令各走各的、没令牌/错令牌/错短口令全 403、连错 36 次后继续猜
+  被限流而正确口令仍进得来、手机上传可用、手机被挡在文件对话框之外、手机心跳不续命
+- **手机侧 7 项**：没有「手机」按钮、**心跳一次都没发**、不拉最近打开、「打开文件」走手机
+  自己的选择框、选文件走 `/api/upload`
+
+这一版修掉的三个坑都写在代码注释里：`position:fixed` 的侧栏让画布宽度变 0（网格少了一列）、
+`#app aside` 把右侧清单抽屉一起钉到左边（抽屉也是 `<aside>`，要用 `#app > aside`）、
+全局 `canvas{position:absolute}` 把二维码钉到了页面左上角。
+
+## 手机上用
+
+维修时人蹲在板子旁边、板子在桌上、电脑在客厅 —— 手上只有手机。这一版补上了这条路。
+
+**两块屏看同一块板（桌面版）**：点右上角 **📱 手机**，弹出二维码，手机和电脑连同一个
+Wi-Fi 扫一下就进来。看的是电脑上当前这块板，手机上只是另一块屏。
+
+**手势**（手机、平板都一样）：
+
+| 动作 | 作用 |
+|---|---|
+| 一指拖 | 平移。一比一跟手，**不带惯性** —— 惯性会让落点偏半毫米，查线要出错 |
+| 两指捏 | 缩放，以双指中点为锚点。捏的同时挪动中点＝一边放大一边挪过去，不用先松手 |
+| 轻点 | 等于单击：点亮一条网络 / 一个焊盘 |
+| 双击 | 取消高亮 |
+| 长按 | 打标记（等于右键），手机会震一下 |
+
+窄屏（≤820px）自己换成「维修密度」：左侧栏收成滑出的浮层（点底部「图层」开、点空白处收），
+工具条改成单行横滑不折行，底部一排五个大按钮（打开 / 图层 / 通不通 / 量距 / 适合窗口），
+方向盘和悬停气泡隐掉。判据是**窗口宽度**，平板横屏、桌面窗口拖窄也会切。
+
+**只存在手机里的板子也能看**：点「打开文件」选手机上的文件，**解析在电脑上做**，手机只负责
+显示 —— 所以 `.ddb` 这种必须靠 mdbtools 的库，在手机上也能开。
+
+**边界**（写清楚，是为了让人敢用）：手机进不来电脑的文件系统 —— `打开文件` / `最近打开`
+对手机一律 403，只能上传自己选中的那一份；地址只在程序运行期间有效，局域网外打不开；
+手机连进来**不会**让电脑上的进程赖着不退出。第一次运行 Windows 会弹一次防火墙询问，
+选「专用网络」允许；不允许也不会坏，只是手机连不上，电脑这边照常用。
 
 ## v1.24 重点
 
@@ -997,6 +1059,53 @@ Mouse: the wheel zooms **anchored at the pointer**; **drag to the edge of the ca
 view keeps moving that way** (faster the closer you get, stops when you let go); once zoomed
 in, the **mini-map in the top-left** shows your viewport as a yellow box — click to jump;
 **right-click on the board writes a note**, saved per board.
+
+## What's new in v1.25
+
+**No new formats — a second way to look at the board.** The twelve-format list stays frozen;
+this release only answers "I'm not sitting at the computer".
+
+- **Touch layer**: one-finger pan, two-finger pinch anchored at the midpoint, tap to select,
+  double tap to clear, long press for a marker. The mouse path is untouched — the two paths
+  are independent, so desktop feel is byte-for-byte the same.
+- **Narrow layout**: below 820 px the UI switches on its own (slide-out sidebar, single
+  horizontally scrolling toolbar, five big thumb-reach buttons at the bottom).
+- **Scan and go**: **📱 手机** in the desktop header shows a QR code; the phone joins over
+  the same Wi-Fi and shows the same board. The QR is **computed in-house** (~300 lines,
+  zero dependencies in `copperlens.py`); correctness was checked by decoding every matrix
+  with OpenCV's independent QRCodeDetector — 6 payloads × 4 ECC levels, Chinese included —
+  and finally by decoding the code out of a screenshot of the running page.
+- **Locks and boundaries**: the desktop URL keeps its 32-hex token; the phone uses
+  `/p/<8 hex pin>`. Thirty wrong guesses per minute per address are throttled, but a correct
+  pin still gets in. The phone cannot reach the computer's file dialogs or recent list (403),
+  and phone heartbeats do not keep the desktop process alive.
+
+## Using it on a phone
+
+**Two screens, one board**: tap **📱 手机** in the header, scan the QR with the phone on the
+same Wi-Fi. The board stays on the computer; the phone is just a second screen.
+
+| Gesture | Does |
+|---|---|
+| One-finger drag | Pan. One-to-one with the finger, **no inertia** — inertia lands you half a millimetre off, which matters when tracing |
+| Two-finger pinch | Zoom around the midpoint; moving the midpoint while pinching pans at the same time |
+| Tap | Same as a click: light up a net or a pad |
+| Double tap | Clear the highlight |
+| Long press | Drop a marker (same as right-click); the phone buzzes |
+
+Below 820 px the layout switches to "repair density": sidebar slides in from the left
+(bottom **Layers** button opens it, tapping the backdrop closes it), toolbar scrolls
+horizontally instead of wrapping, five large buttons along the bottom, nav pad and hover
+tooltip hidden. The trigger is **window width**, not the user agent.
+
+**A board that only exists on the phone** works too: tap Open and pick it there —
+**parsing runs on the computer**, so `.ddb` libraries open from the phone as well.
+
+**Boundaries**: the phone never sees the computer's filesystem (`Open` / `Recent` answer 403
+to it, it can only upload what it picked); the address lives only while the app runs and only
+on your network; a connected phone does **not** keep the desktop process alive. Windows asks
+about the firewall on first run — allow private networks. Declining does not break anything:
+the phone simply cannot connect and the desktop carries on.
 
 ## What's new in v1.24
 

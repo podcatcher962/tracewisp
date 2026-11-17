@@ -2,7 +2,7 @@
 #
 # Copyright (C) 2026 永远的兰兰 (Lanlan Eternal)
 # SPDX-License-Identifier: GPL-3.0-or-later
-# This file is part of CopperLens. See LICENSE in the repository root.
+# This file is part of TraceWisp (formerly CopperLens). See LICENSE in the repository root.
 #
 """用 32 位 Python 打包成单文件 exe（x86；32 位系统直接跑，64 位系统向下兼容）。
 
@@ -23,7 +23,7 @@ for cand in (os.environ.get("PYI_TARGET"), os.path.join(ROOT, "_py32")):
 import PyInstaller.__main__  # noqa: E402
 
 SRC = os.path.join(ROOT, "src", "copperlens.py")
-NAME = "PCB看板"
+NAME = "TraceWisp"
 # 可选：把产物放到别的目录。exe 正在运行时没法覆盖它，先出到旁边再换。
 OUTDIR = sys.argv[1] if len(sys.argv) > 1 else ROOT
 if not os.path.isabs(OUTDIR):

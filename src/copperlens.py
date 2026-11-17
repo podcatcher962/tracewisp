@@ -3,10 +3,10 @@
 #
 # Copyright (C) 2026 永远的兰兰 (Lanlan Eternal)
 # SPDX-License-Identifier: GPL-3.0-or-later
-# This file is part of CopperLens. See LICENSE in the repository root.
+# This file is part of TraceWisp (formerly CopperLens). See LICENSE in the repository root.
 #
 """
-PCB 看板 / CopperLens（桌面版 / 单 exe）
+铜迹 / TraceWisp（桌面版 / 单 exe）
 
     · 打开老式 EDA 软件的设计库(.ddb)：自动把里面所有 PCB 抽出来，一次全带上，
       界面上用下拉框切换（★最新 排第一）
@@ -36,6 +36,7 @@ import json
 import os
 import re
 import secrets
+import socket
 import socketserver
 import subprocess
 import sys
@@ -46,8 +47,11 @@ import urllib.parse
 from ctypes import wintypes
 from pathlib import Path
 
-APP_TITLE = "PCB 看板 CopperLens"
-VERSION = "1.24.2"
+APP_TITLE = "铜迹 TraceWisp"
+VERSION = "1.25.0"
+
+# 认自己窗口时看的标题关键词。改名之前/之后都收，老用户的更新包不会认不到自己的窗口。
+_SELF_TITLES = ("铜迹", "TraceWisp", "CopperLens", "PCB 看板")
 
 _APPDIR = "CopperLens"
 _LOG = Path(tempfile.gettempdir()) / _APPDIR / "last-run.log"
@@ -88,6 +92,351 @@ def res_path(*parts):
         return p
     alt = base.parent.joinpath(*parts)
     return alt if alt.exists() else p
+
+
+# ============================================================ 局域网：手机看板
+def _lan_ip():
+    """本机在局域网里的地址（192.168.x.x 这种）。取不到返回空串。
+
+    做法是让系统替我们选：UDP connect 不发包，只让协议栈按路由表选出口网卡，
+    再从本地端取地址 —— 比枚举网卡猜"哪块是给家里用的"可靠得多
+    （虚拟机的 vmnet、VPN 的 tun 都会被排掉，因为它们不是默认路由）。
+    """
+    s = None
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("223.5.5.5", 80))
+        ip = s.getsockname()[0]
+    except OSError:
+        ip = ""
+    finally:
+        if s is not None:
+            try:
+                s.close()
+            except OSError:
+                pass
+    return ip if ip and not ip.startswith("127.") else ""
+
+
+# ---------------------------------------------------------------- 二维码
+# 为什么自己算：铜迹是 PyInstaller 单文件 exe，为了一个二维码再拖进
+# qrcode / segno 这种依赖不划算（体积、许可声明都要跟着长）。这里只实现
+# 「给一段地址，算出一张模块矩阵」，零依赖，页面那边用 canvas 画方块。
+# 字节模式，版本 1~10，四种纠错级别；一个局域网地址最多 80 字节，远远够用。
+# 正确性用 OpenCV 的 QRCodeDetector 独立解码验证过（中英文、四个级别）。
+_QR_TABLE = {
+    1: {'L': (7, [(1, 19)]), 'M': (10, [(1, 16)]),
+        'Q': (13, [(1, 13)]), 'H': (17, [(1, 9)])},
+    2: {'L': (10, [(1, 34)]), 'M': (16, [(1, 28)]),
+        'Q': (22, [(1, 22)]), 'H': (28, [(1, 16)])},
+    3: {'L': (15, [(1, 55)]), 'M': (26, [(1, 44)]),
+        'Q': (18, [(2, 17)]), 'H': (22, [(2, 13)])},
+    4: {'L': (20, [(1, 80)]), 'M': (18, [(2, 32)]),
+        'Q': (26, [(2, 24)]), 'H': (16, [(4, 9)])},
+    5: {'L': (26, [(1, 108)]), 'M': (24, [(2, 43)]),
+        'Q': (18, [(2, 15), (2, 16)]), 'H': (22, [(2, 11), (2, 12)])},
+    6: {'L': (18, [(2, 68)]), 'M': (16, [(4, 27)]),
+        'Q': (24, [(4, 19)]), 'H': (28, [(4, 15)])},
+    7: {'L': (20, [(2, 78)]), 'M': (18, [(4, 31)]),
+        'Q': (18, [(2, 14), (4, 15)]), 'H': (26, [(4, 13), (1, 14)])},
+    8: {'L': (24, [(2, 97)]), 'M': (22, [(2, 38), (2, 39)]),
+        'Q': (22, [(4, 18), (2, 19)]), 'H': (26, [(4, 14), (2, 15)])},
+    9: {'L': (30, [(2, 116)]), 'M': (22, [(3, 36), (2, 37)]),
+        'Q': (20, [(4, 16), (4, 17)]), 'H': (24, [(4, 12), (4, 13)])},
+    10: {'L': (18, [(2, 68), (2, 69)]), 'M': (26, [(4, 43), (1, 44)]),
+         'Q': (24, [(6, 19), (2, 20)]), 'H': (28, [(6, 15), (2, 16)])},
+}
+_QR_ALIGN = {1: [], 2: [6, 18], 3: [6, 22], 4: [6, 26], 5: [6, 30], 6: [6, 34],
+             7: [6, 22, 38], 8: [6, 24, 42], 9: [6, 26, 46], 10: [6, 28, 50]}
+_QR_EC = {'L': 1, 'M': 0, 'Q': 3, 'H': 2}
+
+
+def _gf_mul(x, y):
+    z = 0
+    for i in range(7, -1, -1):
+        z = (z << 1) ^ ((z >> 7) * 0x11D)
+        z ^= ((y >> i) & 1) * x
+    return z & 0xFF
+
+
+def _gf_pow2(n):
+    r = 1
+    for _ in range(n):
+        r = _gf_mul(r, 2)
+    return r
+
+
+def _rs_ecc(data, n):
+    """Reed-Solomon：对 data 算出 n 个纠错码字。"""
+    gen = [1]
+    for i in range(n):
+        a = _gf_pow2(i)
+        nxt = [0] * (len(gen) + 1)
+        for j, g in enumerate(gen):
+            nxt[j] ^= _gf_mul(g, a)
+            nxt[j + 1] ^= g
+        gen = nxt
+    # 上面按「低次在前」累乘出来的，长除要「高次在前」，翻一次
+    gen = gen[::-1]
+    rem = list(data) + [0] * n
+    for i in range(len(data)):
+        c = rem[i]
+        if c == 0:
+            continue
+        for j, g in enumerate(gen):
+            rem[i + j] ^= _gf_mul(g, c)
+    return rem[len(data):]
+
+
+def _qr_fmt(ecc, mask):
+    """15 位格式信息：2 位纠错级别 + 3 位掩码 + 10 位 BCH，再异或 0x5412。"""
+    data = (_QR_EC[ecc] << 3) | mask
+    v = data << 10
+    for i in range(4, -1, -1):
+        if v & (1 << (i + 10)):
+            v ^= 0x537 << i
+    return ((data << 10) | v) ^ 0x5412
+
+
+def _qr_ver(ver):
+    """18 位版本信息（版本 ≥ 7 才用）。"""
+    v = ver << 12
+    for i in range(5, -1, -1):
+        if v & (1 << (i + 12)):
+            v ^= 0x1F25 << i
+    return (ver << 12) | v
+
+
+def _qr_cap(ver, ecc):
+    ec, groups = _QR_TABLE[ver][ecc]
+    data_cw = sum(cnt * per for cnt, per in groups)
+    header = 4 + (8 if ver < 10 else 16)
+    return (data_cw * 8 - header) // 8
+
+
+def _qr_codewords(raw, ver, ecc):
+    ec_len, groups = _QR_TABLE[ver][ecc]
+    data_cw = sum(cnt * per for cnt, per in groups)
+    bits = []
+
+    def put(val, n):
+        for i in range(n - 1, -1, -1):
+            bits.append((val >> i) & 1)
+
+    put(0b0100, 4)                                   # 字节模式
+    put(len(raw), 8 if ver < 10 else 16)             # 字符计数
+    for b in raw:
+        put(b, 8)
+    room = data_cw * 8 - len(bits)
+    put(0, min(4, room))                             # 结束符
+    while len(bits) % 8:
+        bits.append(0)
+    i = 0
+    while len(bits) < data_cw * 8:                   # 填充字节 236 / 17 交替
+        put((0xEC, 0x11)[i % 2], 8)
+        i += 1
+
+    data = [0] * data_cw
+    for i in range(data_cw):
+        v = 0
+        for j in range(8):
+            v = (v << 1) | bits[i * 8 + j]
+        data[i] = v
+
+    blocks, eccs, pos = [], [], 0
+    for cnt, per in groups:
+        for _ in range(cnt):
+            blk = data[pos:pos + per]
+            pos += per
+            blocks.append(blk)
+            eccs.append(_rs_ecc(blk, ec_len))
+    out = []
+    for i in range(max(len(b) for b in blocks)):
+        for b in blocks:
+            if i < len(b):
+                out.append(b[i])
+    for i in range(ec_len):
+        for e in eccs:
+            out.append(e[i])
+    return out
+
+
+def _qr_mask(mask, r, c):
+    if mask == 0:
+        return (r + c) % 2 == 0
+    if mask == 1:
+        return r % 2 == 0
+    if mask == 2:
+        return c % 3 == 0
+    if mask == 3:
+        return (r + c) % 3 == 0
+    if mask == 4:
+        return (r // 2 + c // 3) % 2 == 0
+    if mask == 5:
+        return (r * c) % 2 + (r * c) % 3 == 0
+    if mask == 6:
+        return ((r * c) % 2 + (r * c) % 3) % 2 == 0
+    return ((r + c) % 2 + (r * c) % 3) % 2 == 0
+
+
+def _qr_place(size, ver, ecc, mask, cw):
+    m = [[0] * size for _ in range(size)]
+    fn = [[False] * size for _ in range(size)]
+
+    def setf(r, c, v):
+        if 0 <= r < size and 0 <= c < size:
+            m[r][c] = v
+            fn[r][c] = True
+
+    for (r0, c0) in ((0, 0), (0, size - 7), (size - 7, 0)):
+        for dr in range(-1, 8):
+            for dc in range(-1, 8):
+                r, c = r0 + dr, c0 + dc
+                if not (0 <= r < size and 0 <= c < size):
+                    continue
+                if 0 <= dr <= 6 and 0 <= dc <= 6:
+                    edge = dr in (0, 6) or dc in (0, 6)
+                    core = 2 <= dr <= 4 and 2 <= dc <= 4
+                    setf(r, c, 1 if (edge or core) else 0)
+                else:
+                    setf(r, c, 0)
+    for i in range(8, size - 8):
+        setf(6, i, 1 if i % 2 == 0 else 0)
+        setf(i, 6, 1 if i % 2 == 0 else 0)
+    pts = _QR_ALIGN[ver]
+    for r0 in pts:
+        for c0 in pts:
+            if (r0, c0) in ((6, 6), (6, pts[-1]), (pts[-1], 6)):
+                continue
+            for dr in range(-2, 3):
+                for dc in range(-2, 3):
+                    setf(r0 + dr, c0 + dc, 0 if max(abs(dr), abs(dc)) == 1 else 1)
+    # 预留格式信息区，再补固定的深色模块 —— 顺序反了会把 (size-8,8) 擦成 0
+    for i in range(9):
+        if not fn[8][i]:
+            setf(8, i, 0)
+        if not fn[i][8]:
+            setf(i, 8, 0)
+    for i in range(8):
+        setf(8, size - 1 - i, 0)
+    for i in range(7):
+        setf(size - 1 - i, 8, 0)
+    setf(size - 8, 8, 1)
+    if ver >= 7:
+        vb = _qr_ver(ver)
+        for i in range(18):
+            bit = (vb >> i) & 1
+            setf(i // 3, size - 11 + i % 3, bit)
+            setf(size - 11 + i % 3, i // 3, bit)
+
+    bits = []
+    for b in cw:
+        for i in range(7, -1, -1):
+            bits.append((b >> i) & 1)
+    total = size * size - sum(1 for row in fn for x in row if x)
+    if len(bits) < total:
+        bits += [0] * (total - len(bits))
+
+    idx = 0
+    col = size - 1
+    upward = True
+    while col > 0:
+        if col == 6:
+            col -= 1
+        for i in range(size):
+            r = size - 1 - i if upward else i
+            for c in (col, col - 1):
+                if fn[r][c]:
+                    continue
+                bit = bits[idx] if idx < len(bits) else 0
+                idx += 1
+                m[r][c] = bit ^ (1 if _qr_mask(mask, r, c) else 0)
+        upward = not upward
+        col -= 2
+
+    # 格式信息：绕左上角那份分「竖臂 / 横臂」放，第二份在右上（横）与左下（竖）
+    fb = _qr_fmt(ecc, mask)
+    for i in range(15):
+        bit = (fb >> i) & 1
+        if i < 6:
+            m[i][8] = bit
+        elif i == 6:
+            m[7][8] = bit
+        elif i == 7:
+            m[8][8] = bit
+        elif i == 8:
+            m[8][7] = bit
+        else:
+            m[8][14 - i] = bit
+        if i < 8:
+            m[8][size - 1 - i] = bit
+        else:
+            m[size - 15 + i][8] = bit
+    return m
+
+
+def _qr_penalty(m):
+    size = len(m)
+    n = 0
+    cols = [[m[r][c] for r in range(size)] for c in range(size)]
+    for lines in (m, cols):
+        for row in lines:
+            run, prev = 1, row[0]
+            for v in row[1:]:
+                if v == prev:
+                    run += 1
+                else:
+                    if run >= 5:
+                        n += 3 + (run - 5)
+                    run, prev = 1, v
+            if run >= 5:
+                n += 3 + (run - 5)
+    for r in range(size - 1):
+        for c in range(size - 1):
+            v = m[r][c]
+            if v == m[r][c + 1] == m[r + 1][c] == m[r + 1][c + 1]:
+                n += 3
+    pat = [1, 0, 1, 1, 1, 0, 1]
+    for lines in (m, cols):
+        for row in lines:
+            for i in range(size - 6):
+                if row[i:i + 7] == pat:
+                    before = row[max(0, i - 4):i]
+                    after = row[i + 7:i + 11]
+                    if len(before) == 4 and not any(before):
+                        n += 40
+                    elif len(after) == 4 and not any(after):
+                        n += 40
+    dark = sum(1 for row in m for v in row if v)
+    n += 10 * (abs(dark * 100 // (size * size) - 50) // 5)
+    return n
+
+
+def _qr_matrix(text, ecc='M'):
+    """把 text 编成二维码。返回 (size, matrix)，matrix[r][c] = 0/1。"""
+    raw = text.encode("utf-8") if isinstance(text, str) else bytes(text)
+    ver = 0
+    for v in range(1, 11):
+        if _qr_cap(v, ecc) >= len(raw):
+            ver = v
+            break
+    if not ver:
+        raise ValueError("内容太长，装不下")
+    cw = _qr_codewords(raw, ver, ecc)
+    size = 17 + 4 * ver
+    best, best_n = None, None
+    for mask in range(8):
+        m = _qr_place(size, ver, ecc, mask, cw)
+        p = _qr_penalty(m)
+        if best_n is None or p < best_n:
+            best, best_n = m, p
+    return size, best
+
+
+def _qr_rows(text):
+    """给页面用的紧凑写法：每行一串 '0'/'1'。29×29 的码也就 841 个字符。"""
+    size, m = _qr_matrix(text, 'M')
+    return ["".join("1" if v else "0" for v in row) for row in m]
 
 
 # ------------------------------------------------------------ Win32 对话框
@@ -185,7 +534,7 @@ def _viewer_hwnd():
     "窗口还在、页面也在动，但点 X 没反应、整窗变灰"。
 
     ⚠ 后来还发现：用户在**夸克/普通浏览器**里打开在线版（标题同样带
-    "PCB 看板 CopperLens"）时，这函数会把那个标签页当成自己的窗口，
+    "铜迹 TraceWisp"）时，这函数会把那个标签页当成自己的窗口，
     于是给别人家的窗口发 EnableWindow / SetForegroundWindow。
     所以现在四重要求：可见 + 类名是浏览器窗口 + 进程是我们认的浏览器 +
     标题里**没有 " - "**（浏览器标签页会追加 " - Microsoft Edge" / " - 夸克"，
@@ -216,7 +565,7 @@ def _viewer_hwnd():
                 b = ctypes.create_unicode_buffer(ln + 1)
                 _user32.GetWindowTextW(hwnd, b, ln + 1)
                 t = b.value
-                if "CopperLens" not in t and "PCB 看板" not in t:
+                if not any(k in t for k in _SELF_TITLES):
                     return True
                 if " - " in t:          # 浏览器标签页：标题后面挂着浏览器名
                     return True
@@ -839,17 +1188,29 @@ def extract_pcbs(ddb):
 LTSC 机器没有、离线也装不上，一旦缺了程序就打不开。Edge --app + 本机回环没有这个前提。
 """
 
-_home_html = [b""]
+_home_html = [b""]        # 本机那侧（带「手机」按钮与二维码）
+_home_remote = [b""]      # 手机连进来那侧（不发心跳、不列最近打开）
 _last_ping = [0.0]
 # 页面临走前打的招呼（时间戳）。窗口关掉时浏览器会发一次 pagehide，
 # 收到就退出；但要留 2.5 秒宽限，免得"刷新一下"也被当成关闭。
 _bye = [0.0]
+# 手机登录用的短口令（8 位十六进制）。二维码和手输地址都只带它，
+# 那个 32 位的长口令只留在本机地址里，不必让用户看见。
+_pin = [""]
 
 
-def build_home_html(token):
+def build_home_html(token, remote=False, lan=None):
     tpl = res_path("index.html").read_text(encoding="utf-8")
-    inject = ("<script>window.__DESKTOP__=1;window.__TOKEN__=%s;"
-              "window.__TITLE__=\"\";</script>") % json.dumps(token)
+    parts = ["window.__DESKTOP__=1",
+             "window.__TOKEN__=%s" % json.dumps(token),
+             'window.__TITLE__=""']
+    if remote:
+        # 手机这一侧：没有电脑上的文件对话框，也不该发心跳拖着主进程
+        parts.append("window.__REMOTE__=1")
+    if lan:
+        parts.append("window.__LAN__=%s" % json.dumps(
+            lan, ensure_ascii=False, separators=(",", ":")))
+    inject = "<script>" + ";".join(parts) + ";</script>"
     return tpl.replace("</head>", inject + "</head>", 1).encode("utf-8")
 
 
@@ -1494,9 +1855,14 @@ class _HomeServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
     allow_reuse_address = True
 
 
-def _make_handler(token, home_html):
+def _make_handler(token):
+    # 手机连进来要输 8 位短口令。8 位十六进制 = 43 亿种，家里网内基本猜不到；
+    # 再加一道"同一台机器一分钟内错 30 次就歇 60 秒"，猜的代价直接变成不可行。
+    _bad = {}
+
     class H(http.server.BaseHTTPRequestHandler):
-        server_version = "CopperLensHome"
+        server_version = "TraceWispHome"
+        remote = False          # 这一请求是手机来的吗（_gate 里定）
 
         def log_message(self, fmt, *args):
             log("  http " + (fmt % args))
@@ -1518,13 +1884,51 @@ def _make_handler(token, home_html):
             self._send(code, json.dumps(obj, ensure_ascii=False),
                        "application/json; charset=utf-8")
 
+        def _is_local(self):
+            """这条请求是不是从本机发出来的（浏览器就在这台电脑上）。"""
+            a = self.client_address[0] if self.client_address else ""
+            return a in ("127.0.0.1", "::1", "localhost")
+
+        def _throttled(self):
+            ip = self.client_address[0] if self.client_address else "?"
+            now = time.time()
+            cnt, t0 = _bad.get(ip, (0, now))
+            if now - t0 > 60:
+                cnt, t0 = 0, now
+            _bad[ip] = (cnt, t0)
+            return cnt > 30
+
+        def _fail(self):
+            ip = self.client_address[0] if self.client_address else "?"
+            now = time.time()
+            cnt, t0 = _bad.get(ip, (0, now))
+            if now - t0 > 60:
+                cnt, t0 = 0, now
+            _bad[ip] = (cnt + 1, t0)
+
         def _gate(self):
             u = urllib.parse.urlparse(self.path)
             q = urllib.parse.parse_qs(u.query)
-            if (q.get("t") or [""])[0] != token:
-                self._json({"error": "forbidden"}, 403)
+            t = (q.get("t") or [""])[0]
+            pin = _pin[0]
+            # ① 手机扫码进来：/p/<短口令>
+            if u.path.startswith("/p/"):
+                if pin and u.path[3:].strip("/") == pin:
+                    self.remote = True
+                    return u
+            # ② 页面里的 fetch：本机用长口令，手机用短口令
+            elif t and t == token:
+                self.remote = not self._is_local()
+                return u
+            elif t and pin and t == pin:
+                self.remote = True
+                return u
+            if self._throttled():
+                self._json({"error": "too many attempts"}, 429)
                 return None
-            return u
+            self._fail()
+            self._json({"error": "forbidden"}, 403)
+            return None
 
         def do_GET(self):
             # 浏览器自动要图标，它不带令牌；直接回空，别在记录里刷 403
@@ -1533,18 +1937,35 @@ def _make_handler(token, home_html):
             u = self._gate()
             if u is None:
                 return
-            if u.path in ("/", "/index.html"):
-                return self._send(200, home_html, "text/html; charset=utf-8")
+            if u.path in ("/", "/index.html") or u.path.startswith("/p/"):
+                html = _home_remote[0] if self.remote else _home_html[0]
+                return self._send(200, html or _home_html[0],
+                                  "text/html; charset=utf-8")
             if u.path == "/api/ping":
-                _last_ping[0] = time.time()
+                # 只有本机页面能续命：手机连进来不该拖着主进程不退出
+                if not self.remote:
+                    _last_ping[0] = time.time()
                 return self._json({"ok": True})
             if u.path == "/api/recent":
+                if self.remote:
+                    return self._json({"items": []})
                 return self._json(_recent_listing())
             if u.path == "/api/bye":
                 # sendBeacon 有时走 GET，两个方法都认
                 _bye[0] = time.time()
                 return self._json({"ok": True})
             self._json({"error": "not found"}, 404)
+
+        def _no_remote(self):
+            """电脑上的文件系统只给本机页面看 —— 手机点不到别人电脑的盘。"""
+            if self.remote:
+                self._json({"error": L("手机上翻不到电脑的文件夹 —— 请点「打开文件」"
+                                       "选手机上的文件，解析会在电脑这边做。",
+                                       "The phone cannot browse the computer's folders — "
+                                       "tap Open File and pick a file on the phone; "
+                                       "parsing happens on the computer.")}, 403)
+                return True
+            return False
 
         def do_POST(self):
             u = self._gate()
@@ -1556,6 +1977,8 @@ def _make_handler(token, home_html):
                 _bye[0] = time.time()
                 return self._json({"ok": True})
             if u.path == "/api/open":
+                if self._no_remote():
+                    return
                 log("弹出文件对话框（父窗口=%r）" % _viewer_hwnd())
                 path = ask_file()
                 log("对话框返回：%r" % path)
@@ -1581,6 +2004,8 @@ def _make_handler(token, home_html):
                     log("拖入文件解析失败：%r" % e)
                     return self._json({"error": str(e)})
             if u.path == "/api/recent":
+                if self._no_remote():
+                    return
                 # 只认记录里已有的路径，前端传不了任意路径过来
                 q = urllib.parse.parse_qs(u.query)
                 try:
@@ -1609,12 +2034,19 @@ def _make_handler(token, home_html):
 
 
 def run_home():
-    """双击启动：海报 → 首页 → 自己点"打开文件"。"""
+    """双击启动：海报 → 首页 → 自己点"打开文件"。
+
+    顺带把手机那条路开出来：服务绑 0.0.0.0，算好局域网地址与二维码一起注入页面。
+    """
     threading.Thread(target=_unstick_guard, daemon=True).start()
     token = secrets.token_hex(16)
+    _pin[0] = secrets.token_hex(4)      # 手机上要输/要扫的那个短口令
     _home_html[0] = build_home_html(token)
     try:
-        srv = _HomeServer(("127.0.0.1", 0), _make_handler(token, _home_html[0]))
+        # 绑 0.0.0.0 而不是 127.0.0.1：手机要能进来。门锁仍然是那个口令 ——
+        # 没有口令访问任何页面都是 403，局域网里别人扫不到你的码就进不来。
+        # Windows 第一次会弹一次防火墙询问，允许「专用网络」即可。
+        srv = _HomeServer(("0.0.0.0", 0), _make_handler(token))
     except OSError as e:
         # 端口被安全软件挡住之类：退回老做法，宁可弹个框也不能打不开
         log("本机服务起不来：%r —— 回退到直接弹文件对话框" % e)
@@ -1625,6 +2057,22 @@ def run_home():
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     url = "http://127.0.0.1:%d/?t=%s" % (port, token)
     log("首页地址：%s" % url)
+
+    # 手机那一侧：地址 + 二维码。二维码在这里就算好，页面只画方块。
+    lan_ip = _lan_ip()
+    if lan_ip:
+        lan_url = "http://%s:%d/p/%s" % (lan_ip, port, _pin[0])
+        try:
+            lan = {"url": lan_url, "ip": lan_ip, "port": port,
+                   "qr": _qr_rows(lan_url)}
+        except Exception as e:
+            log("二维码生成失败（不影响其他功能）：%r" % e)
+            lan = {"url": lan_url, "ip": lan_ip, "port": port, "qr": []}
+        _home_html[0] = build_home_html(token, lan=lan)
+        _home_remote[0] = build_home_html(_pin[0], remote=True)
+        log("手机地址：%s" % lan_url)
+    else:
+        log("没有可用的局域网地址 —— 手机看板这次不可用（不影响本机使用）")
 
     proc = open_viewer(url)
     if proc is None:

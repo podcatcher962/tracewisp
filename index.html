@@ -231,35 +231,38 @@
   .hint .drop [data-ddb]{margin-top:6px;font-size:12px;line-height:1.6}
 
   /* ---- 触屏：一指能点中、双指能放大 ----
-     ⚠ 尺寸一律用 vw，不用 px。手机浏览器若处在「电脑版网站」模式，
-       布局视口会变成 980px 再把整页缩到屏幕上（K80 实测就是），
-       px 会被一起缩掉，vw 跟着视口走 —— 412 和 980 下看起来一样大。 */
+     尺寸写成 calc(基准px × var(--mobk))，基准值按 412 宽量。
+     --mobk 由 JS 算：布局视口 ÷ 屏幕 CSS 宽。
+       · 正常手机 412/412 = 1     → 就是量好的大小
+       · 电脑版网站 980/412 = 2.38 → K80 实测就是这种，整页被缩到 2.4 分之一，
+                                     乘回去肉眼才一样大
+       · iPad 768/768 = 1         → 正常 px，不会被撑大 */
   @media (hover:none) and (max-width:1000px){
     /* 宽度也要跟着视口走：不写这条，980 视口下框只有 62% 宽（内容撑开的），
        缩到手机屏上就是窄窄一条。 */
-    .hint .drop{width:calc(100% - 8vw);max-width:none;
-      padding:5.6vw 4.8vw 5vw;border-width:.42vw;border-radius:3.4vw}
-    .hint .drop .big{font-size:6.5vw;line-height:1.3;letter-spacing:.5px;color:var(--fg)}
+    .hint .drop{width:calc(100% - calc(33px * var(--mobk,1)));max-width:none;
+      padding:calc(23.1px * var(--mobk,1)) calc(19.8px * var(--mobk,1)) calc(20.6px * var(--mobk,1));border-width:calc(1.7px * var(--mobk,1));border-radius:calc(14px * var(--mobk,1))}
+    .hint .drop .big{font-size:calc(26.8px * var(--mobk,1));line-height:1.3;letter-spacing:.5px;color:var(--fg)}
     .hint .drop .big .d{display:none}
     .hint .drop .big .m{display:inline}
-    .hint .drop .big::before{content:"\1F4C2";display:block;font-size:10.4vw;
-      line-height:1;margin-bottom:3.2vw}
+    .hint .drop .big::before{content:"\1F4C2";display:block;font-size:calc(42.8px * var(--mobk,1));
+      line-height:1;margin-bottom:calc(13.2px * var(--mobk,1))}
     /* 主入口做成实心大按钮：左上角那行小字在手机上够不着，也看不见 */
-    .hint .drop .pick{display:block;width:100%;margin:4.4vw 0 1vw;padding:4.1vw 2vw;
-      border:0;border-radius:2.9vw;background:#2f6fd0;color:#fff;
-      font-family:inherit;font-size:4.1vw;letter-spacing:.15vw;
-      -webkit-tap-highlight-color:transparent;box-shadow:0 1.4vw 4.4vw #2f6fd060}
+    .hint .drop .pick{display:block;width:100%;margin:calc(18.1px * var(--mobk,1)) 0 calc(4.1px * var(--mobk,1));padding:calc(16.9px * var(--mobk,1)) calc(8.2px * var(--mobk,1));
+      border:0;border-radius:calc(11.9px * var(--mobk,1));background:#2f6fd0;color:#fff;
+      font-family:inherit;font-size:calc(16.9px * var(--mobk,1));letter-spacing:calc(0.6px * var(--mobk,1));
+      -webkit-tap-highlight-color:transparent;box-shadow:0 calc(5.8px * var(--mobk,1)) calc(18.1px * var(--mobk,1)) #2f6fd060}
     .hint .drop .pick:active{background:#2a63bb}
-    .hint .drop [data-fmt]{margin-top:2.4vw;font-size:3.35vw;line-height:1.85}
-    .hint .privacy{margin-top:3vw;padding:2.2vw 3.4vw;border-radius:2.9vw;
-      font-size:3.4vw;line-height:1.55}
-    .hint .drop [data-ddb]{margin-top:1.6vw;font-size:3vw;line-height:1.6}
+    .hint .drop [data-fmt]{margin-top:calc(9.9px * var(--mobk,1));font-size:calc(13.8px * var(--mobk,1));line-height:1.85}
+    .hint .privacy{margin-top:calc(12.4px * var(--mobk,1));padding:calc(9.1px * var(--mobk,1)) calc(14px * var(--mobk,1));border-radius:calc(11.9px * var(--mobk,1));
+      font-size:calc(14px * var(--mobk,1));line-height:1.55}
+    .hint .drop [data-ddb]{margin-top:calc(6.6px * var(--mobk,1));font-size:calc(12.4px * var(--mobk,1));line-height:1.6}
     .hint .kbdhint{display:none}   /* 滚轮、方向键这些在手机上一条都不成立 */
     /* 空状态中间已经有一个实心大按钮了，底部这条浮起来的「打开」是重复入口，
        一起去掉：既省得两个按钮抢注意力，也不用再给内容留底部空隙。 */
     #app.empty .tbar{display:none}
-    #app.empty .hint{padding-bottom:4vw}
-    .hint .tuchtip{display:block;font-size:3.3vw;line-height:1.9;color:var(--fg3)}
+    #app.empty .hint{padding-bottom:calc(16.5px * var(--mobk,1))}
+    .hint .tuchtip{display:block;font-size:calc(13.6px * var(--mobk,1));line-height:1.9;color:var(--fg3)}
   }
   .hint.over .drop{border-color:var(--accent);background:#f0b42910}
   .hint kbd{background:var(--panel2);border:1px solid var(--line);border-radius:4px;
@@ -551,28 +554,33 @@
      为什么要 vw：「电脑版网站」模式里布局视口是 980、整页被缩到 2.4 分之一，
      px 会被一起缩掉。vw 跟着视口走，412 和 980 下看起来一样大。 */
   @media (hover:none) and (max-width:1000px){
-    header .brand{font-size:3.2vw}
-    header .mbtn{font-size:3.2vw;padding:1.2vw 2.2vw;border-radius:2vw}
-    header .file{font-size:2.9vw;max-width:34vw}
-    header .btn{min-height:10.5vw;padding:0 3.4vw;font-size:3.5vw;border-radius:2.2vw}
-    header #fname{padding:1vw 2vw}
-    footer{font-size:2.8vw;min-height:7vw;padding:.8vw 2vw;gap:2.4vw}
-    .tabs{height:6.6vw;margin:1vw -2vw -1.5vw}
+    header .brand{font-size:calc(13.2px * var(--mobk,1))}
+    header .mbtn{font-size:calc(13.2px * var(--mobk,1));padding:calc(4.9px * var(--mobk,1)) calc(9.1px * var(--mobk,1));border-radius:calc(8.2px * var(--mobk,1))}
+    header .file{font-size:calc(11.9px * var(--mobk,1));max-width:calc(140.1px * var(--mobk,1))}
+    header .btn{min-height:calc(43.3px * var(--mobk,1));padding:0 calc(14px * var(--mobk,1));font-size:calc(14.4px * var(--mobk,1));border-radius:calc(9.1px * var(--mobk,1))}
+    header #fname{padding:calc(4.1px * var(--mobk,1)) calc(8.2px * var(--mobk,1))}
+    footer{font-size:calc(11.5px * var(--mobk,1));min-height:calc(28.8px * var(--mobk,1));padding:calc(3.3px * var(--mobk,1)) calc(8.2px * var(--mobk,1));gap:calc(9.9px * var(--mobk,1))}
+    .tabs{height:calc(27.2px * var(--mobk,1));margin:calc(4.1px * var(--mobk,1)) -calc(8.2px * var(--mobk,1)) -calc(6.2px * var(--mobk,1))}
 
     /* 免责弹窗是手机上第一眼看到的东西，字小就等于让人盲签。
        「同意并继续」改成整宽大按钮：原来它挤在右下角，拇指不好够。 */
-    .modal .hd{padding:3vw 3.6vw}
-    .modal .hd h2{font-size:4.1vw}
-    .modal .bd{font-size:3.4vw;line-height:1.8;padding:3vw 3.6vw 6vw}
+    /* 尺寸一律 min(vw, vh)：竖屏按宽度算、横屏按高度算。
+       只用 vw 的话，640×360 横屏会把正文撑到 22px、勾选框 35px。 */
+    .modal .hd{padding:calc(12.4px * var(--mobk,1)) calc(14.8px * var(--mobk,1))}
+    .modal .hd h2{font-size:min(calc(16.9px * var(--mobk,1)),5.4vh)}
+    .modal .bd{font-size:min(calc(14px * var(--mobk,1)),4.5vh);line-height:1.8;padding:calc(12.4px * var(--mobk,1)) calc(14.8px * var(--mobk,1)) calc(24.7px * var(--mobk,1))}
     /* 正文区是滚动容器，底部留白让"最后一行被切成半截"看着是"还有下文" */
-    .modal .bd p.dim{font-size:3.1vw}
-    .modal .bd h3{font-size:3.5vw;margin:3.4vw 0 1.4vw}
-    .modal .ack{flex-direction:column;align-items:stretch;gap:2.6vw;
-      padding:2.8vw 3.6vw 3.4vw}
+    .modal .bd p.dim{font-size:min(calc(12.8px * var(--mobk,1)),4.1vh)}
+    .modal .bd h3{font-size:min(calc(14.4px * var(--mobk,1)),4.6vh);margin:calc(14px * var(--mobk,1)) 0 calc(5.8px * var(--mobk,1))}
+    .modal .ack{flex-direction:column;align-items:stretch;gap:calc(10.7px * var(--mobk,1));
+      padding:calc(11.5px * var(--mobk,1)) calc(14.8px * var(--mobk,1)) calc(14px * var(--mobk,1))}
     .modal .ack .sp{display:none}
-    .modal .ack label{font-size:3.35vw;line-height:1.55;gap:2.6vw;align-items:flex-start}
-    .modal .ack input[type=checkbox]{width:5.4vw;height:5.4vw;flex:none;margin-top:.4vw}
-    #ackGo{width:100%;min-height:12vw;font-size:4vw;border-radius:2.6vw}
+    .modal .ack label{font-size:min(calc(13.8px * var(--mobk,1)),4.4vh);line-height:1.55;gap:calc(10.7px * var(--mobk,1));
+      align-items:flex-start}
+    .modal .ack input[type=checkbox]{width:min(calc(22.2px * var(--mobk,1)),7.2vh);height:min(calc(22.2px * var(--mobk,1)),7.2vh);
+      flex:none;margin-top:calc(1.6px * var(--mobk,1))}
+    #ackGo{width:100%;min-height:min(calc(49.4px * var(--mobk,1)),15vh);font-size:min(calc(16.5px * var(--mobk,1)),5.2vh);
+      border-radius:calc(10.7px * var(--mobk,1))}
   }
 </style>
 </head>
@@ -12010,6 +12018,26 @@ function openAny(){
   else document.getElementById("file").click();
 }
 document.getElementById("open").onclick=openAny;
+/* 「电脑版网站」模式补救：布局视口(innerWidth)远大于屏幕 CSS 宽时，
+   整页会被缩到几分之一显示，px 尺寸跟着缩水。算出倍数交给 CSS（--mobk），
+   所有手机尺寸按它放大回去；正常视口和 iPad 上恒为 1，一点不受影响。 */
+function syncMobScale(){
+  try{
+    /* 取「这一侧」的屏幕宽：竖屏看短边、横屏看长边。
+       一律取短边会把横屏手机（innerWidth 640 > 短边 360）误判成被缩放。 */
+    const portrait = innerHeight >= innerWidth;
+    const sw = portrait
+      ? Math.min(screen.width||9999, screen.height||9999)
+      : Math.max(screen.width||0, screen.height||0);
+    const k = (sw > 200 && innerWidth > sw * 1.15)
+      ? Math.max(1, Math.min(3.2, innerWidth / sw)) : 1;
+    document.documentElement.style.setProperty("--mobk", k.toFixed(3));
+  }catch(_){}
+}
+syncMobScale();
+addEventListener("resize", syncMobScale);
+addEventListener("orientationchange", ()=>setTimeout(syncMobScale, 120));
+
 document.getElementById("hint").addEventListener("click", e=>{
   if(e.target.closest("#hintOpen,[data-open]")) openAny();
 });

@@ -1298,9 +1298,11 @@ zh:{
        不判断对错</b>。照抄别人记的档案去下探头，后果由抄的人和记的人承担。
        导出的 CSV 一旦离开本机，之后怎么使用与作者无关。</p>
 
-    <h3>档案存在本机，会丢</h3>
-    <p>档案保存在本机浏览器数据里（<b>不联网、不上传</b>）。清理浏览器数据、换电脑、
-       重装系统都会让它消失，程序无从恢复。<b>重要的数字请随手导出 CSV 另存一份。</b></p>
+    <h3>档案存在本机，删了就没有</h3>
+    <p>档案和板上标记保存在本机一个文件里（<b>不联网、不上传</b>，路径见下）。
+       换电脑、重装系统、手动删掉这个文件，都会让它消失，程序无从恢复。
+       <b>重要的数字请随手导出 CSV 另存一份。</b></p>
+    <p>Windows 下的位置：<code>%LOCALAPPDATA%\\CopperLens\\store.json</code></p>
 
     <h3>维修作业风险自负</h3>
     <p>依据本程序显示的信息进行焊接、拆装、通电测试等操作，风险由操作者自行承担。
@@ -1359,7 +1361,7 @@ zh:{
        未随本许可授予任何名称或商标的使用权（第 7(e) 条）。Fork 出去单独发布
        请换个名字，避免用户误认。</p>
     <h3>版本</h3>
-    <p>v1.25.3　·　Windows 10 / 11，32 位 64 位都支持　·　单文件便携版　·　手机扫码看板</p>
+    <p>v1.25.4　·　Windows 10 / 11，32 位 64 位都支持　·　单文件便携版　·　手机扫码看板</p>
     <div class="sig">© 永远的兰兰　·　Lanlan Eternal</div>`
 },
 en:{
@@ -1970,10 +1972,12 @@ en:{
        who recorded them. Once an exported CSV leaves this machine, how it is used is out of
        the author's hands.</p>
 
-    <h3>Log entries live on this machine, and can be lost</h3>
-    <p>Entries are kept in local browser storage (<b>no network, no upload</b>). Clearing
-       browser data, switching machines or reinstalling the OS erases them, and the program
-       cannot recover them. <b>Export a CSV of anything important.</b></p>
+    <h3>Log entries live on this machine, and can be deleted</h3>
+    <p>Entries and board marks are kept in one file on this machine (<b>no network, no
+       upload</b>; path below). Switching machines, reinstalling the OS or deleting that
+       file erases them, and the program cannot recover them.
+       <b>Export a CSV of anything important.</b></p>
+    <p>On Windows: <code>%LOCALAPPDATA%\\CopperLens\\store.json</code></p>
 
     <h3>Repair work is at your own risk</h3>
     <p>Soldering, desoldering and power-on testing based on what this program shows is done
@@ -2035,7 +2039,7 @@ en:{
     <p class="dim">This licence grants rights to the code only. The names "TraceWisp" and "铜迹" and the icons come with no name or trademark licence (§7(e)). Please pick
        a different name if you fork and publish separately.</p>
     <h3>Version</h3>
-    <p>v1.25.3　·　Windows 10 / 11, 32-bit and 64-bit　·　portable single file　·　phone via QR</p>
+    <p>v1.25.4　·　Windows 10 / 11, 32-bit and 64-bit　·　portable single file　·　phone via QR</p>
     <div class="sig">© Lanlan Eternal　·　永远的兰兰</div>`
 }
 };
@@ -13000,19 +13004,76 @@ document.getElementById("drwCsv").onclick = ()=>{
 /* ============================== 板上标记（标注） ==============================
    维修时"这里烧过""测过电压正常"这类结论，写在自己板子上最省事。
    参照同类工具的做法：右键点板子加标注、随板子存档、换板不串。 */
+/* ---- 本机小存储（板上标记 / 档案）----------------------------------------
+   exe 每次开的是随机端口，origin 一变 localStorage 就空 —— 标记和档案
+   关掉窗口就没了。所以这边走 /api/kv 落文件（%LOCALAPPDATA%\CopperLens\store.json），
+   网页版没有那个服务，仍旧用 localStorage 兜着。
+
+   ⚠ 走接口必须用 apiUrl() 拼口令（?t=...），裸 fetch("/api/kv") 一律 403。
+   写和读分开判断：写只看有没有服务（kvApi），不看第一次拉取成没成 ——
+   万一 GET 那一下网络抖了，也不能让用户这一笔存不进去。
+
+   刻意保持「同步读、异步写」：调用处一行都不用改成 await。 */
+const KV = Object.create(null);
+let KV_OK = false;          // 服务端那本字典已经拉到本地了
+let KV_READY = null;
+function kvApi(){ return !!window.__DESKTOP__ && typeof apiUrl === "function"; }
+
+function kvGet(k){
+  if(KV_OK) return (k in KV) ? KV[k] : null;
+  try{ return localStorage.getItem(k); }catch(_){ return null; }
+}
+function kvSet(k, v){
+  const empty = (v === null || v === undefined || v === "");
+  if(KV_OK){ if(empty) delete KV[k]; else KV[k] = String(v); }
+  /* 双写：exe 下 localStorage 每次启动都是空的，写了也不占地方；网页版则只有它。
+     宁可多写一遍，不要因为时序判断错一次就丢数据。 */
+  try{
+    if(empty) localStorage.removeItem(k);
+    else localStorage.setItem(k, String(v));
+  }catch(_){}
+  if(kvApi()){
+    try{
+      fetch(apiUrl("/api/kv"), {method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({k:k, v: empty ? null : String(v)})}).catch(()=>{});
+    }catch(_){}
+  }
+}
+
+if(kvApi()){
+  try{
+    KV_READY = fetch(apiUrl("/api/kv"), {cache:"no-store"})
+      .then(r => r.json())
+      .then(j => {
+        if(!(j && j.ok && j.kv && typeof j.kv === "object")) return;
+        for(const k in j.kv) KV[k] = String(j.kv[k]);
+        KV_OK = true;
+        /* 兜底：万一用户在拉取回来之前就开了板，把笔记补进去重画一次。
+           fetch 走本地回环，实际几十毫秒，正常路径下这一步是空的。 */
+        try{
+          if(typeof lastName === "string" && lastName){ loadMarks(); loadRecs(); draw(); }
+        }catch(_){}
+      })
+      .catch(()=>{});
+  }catch(_){ KV_READY = Promise.resolve(); }
+}else{
+  KV_READY = Promise.resolve();
+}
+
 function mkKey(){
   return "cl.marks|"+boardTag();
 }
 function loadMarks(){
   try{
-    const raw = localStorage.getItem(mkKey());
+    const raw = kvGet(mkKey());
     MARKLIST = raw ? JSON.parse(raw) : [];
   }catch(err){ MARKLIST = []; }
   if(!Array.isArray(MARKLIST)) MARKLIST = [];
   if(DRW === "marks") renderDrawer();
 }
 function saveMarks(){
-  try{ localStorage.setItem(mkKey(), JSON.stringify(MARKLIST)); }catch(err){}
+  try{ kvSet(mkKey(), JSON.stringify(MARKLIST)); }catch(err){}
   if(DRW === "marks") renderDrawer();
   draw();
 }
@@ -13129,7 +13190,7 @@ function drawMarks(){
      · 实测值 —— 点住一条网络，记下 3.31 V / 对地 1.2 kΩ；
      · 认定   —— 只写备注，比如"Q3 实际是 SI2302，图纸标 AO3400"。
 
-   存在浏览器本机（localStorage），按板子分开，换板不串；
+   存在本机（exe 落 store.json，网页版用 localStorage），按板子分开，换板不串；
    要带走就用抽屉里那个「导出 CSV」—— 拷到另一台机器上照着录。
 
    注意：这里只存自己敲进去的数字，不联网、不上传、不猜。
@@ -13148,14 +13209,14 @@ function recKey(){ return "cl.recs|"+boardTag(); }
 
 function loadRecs(){
   try{
-    const raw = localStorage.getItem(recKey());
+    const raw = kvGet(recKey());
     RECS = raw ? JSON.parse(raw) : [];
   }catch(err){ RECS = []; }
   if(!Array.isArray(RECS)) RECS = [];
   if(DRW === "rec") renderDrawer();
 }
 function saveRecs(){
-  try{ localStorage.setItem(recKey(), JSON.stringify(RECS)); }catch(err){}
+  try{ kvSet(recKey(), JSON.stringify(RECS)); }catch(err){}
   if(DRW === "rec") renderDrawer();
 }
 function delRec(i){

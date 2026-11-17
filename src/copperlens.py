@@ -48,7 +48,7 @@ from ctypes import wintypes
 from pathlib import Path
 
 APP_TITLE = "铜迹 TraceWisp"
-VERSION = "1.25.3"
+VERSION = "1.25.4"
 
 # 认自己窗口时看的标题关键词。改名之前/之后都收，老用户的更新包不会认不到自己的窗口。
 _SELF_TITLES = ("铜迹", "TraceWisp", "CopperLens", "PCB 看板")
@@ -1836,6 +1836,58 @@ def _ack_save(ver):
         return False
 
 
+# ------------------------------------------------------ 板注释（本机记录）
+# 「板上标记」和「档案」原先存在 localStorage 里。但 exe 每次都是 127.0.0.1 上的
+# 随机端口，origin 一变，localStorage 就是空的 —— 用户测了一上午的电压，
+# 关掉窗口再开全没了（v1.25.3 已知限制里写的就是这条）。
+# 这里改成落一个文件，一个扁平 dict：key 直接沿用前端的 localStorage 键
+# （"cl.marks|文件名|板名"），value 是原样的 JSON 字符串，服务端不解析内容。
+def _kv_path():
+    base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+    return Path(base) / _APPDIR / "store.json"
+
+
+def _kv_load():
+    """整包读出来。文件不在 / 坏了都当空，不能让一个坏 json 挡着开板。"""
+    try:
+        d = json.loads(_kv_path().read_text(encoding="utf-8"))
+        return d if isinstance(d, dict) else {}
+    except Exception:
+        return {}
+
+
+def _kv_save(kv):
+    try:
+        p = _kv_path()
+        p.parent.mkdir(parents=True, exist_ok=True)
+        tmp = p.with_name(p.name + ".tmp")
+        tmp.write_text(json.dumps(kv, ensure_ascii=False), encoding="utf-8")
+        os.replace(tmp, p)          # 写到一半断电也不会留下半个文件
+        return True
+    except Exception as e:
+        log("板注释写不进去：%r" % e)
+        return False
+
+
+def _kv_set(k, v):
+    """v 为空 / None 当作删除这条。单值上限 4 MB —— 防止页面出错把盘写满。"""
+    k = str(k or "")
+    if not k:
+        return False
+    kv = _kv_load()
+    if v is None or v == "":
+        if k not in kv:
+            return True
+        kv.pop(k, None)
+    else:
+        s = str(v)
+        if len(s) > (4 << 20):
+            log("板注释太大，拒收：%d 字节" % len(s))
+            return False
+        kv[k] = s
+    return _kv_save(kv)
+
+
 def _load_recent():
     try:
         data = json.loads(_recent_path().read_text(encoding="utf-8"))
@@ -2004,6 +2056,11 @@ def _make_handler(token):
             if u.path == "/api/ack":
                 # 手机连进来那侧不弹确认，答案照给（万一以后要用）
                 return self._json({"acked": _ack_load()})
+            if u.path == "/api/kv":
+                # 只有本机页面能读写。手机连进来那侧不碰别人电脑上的笔记。
+                if self.remote:
+                    return self._json({"ok": False, "kv": {}})
+                return self._json({"ok": True, "kv": _kv_load()})
             if u.path == "/api/bye":
                 # sendBeacon 有时走 GET，两个方法都认
                 _bye[0] = time.time()
@@ -2036,6 +2093,14 @@ def _make_handler(token):
                 q = urllib.parse.parse_qs(u.query)
                 ver = (q.get("ver") or [""])[0]
                 return self._json({"ok": _ack_save(ver)})
+            if u.path == "/api/kv":
+                if self._no_remote():
+                    return
+                try:
+                    d = json.loads(body.decode("utf-8")) if body else {}
+                except Exception:
+                    return self._json({"ok": False, "error": "bad json"}, 400)
+                return self._json({"ok": _kv_set(d.get("k"), d.get("v"))})
             if u.path == "/api/open":
                 if self._no_remote():
                     return

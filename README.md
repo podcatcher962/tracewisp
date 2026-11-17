@@ -1,4 +1,4 @@
-# PCB 看板 / CopperLens v1.24.2
+# 亮线 TraceWisp v1.24.2
 
 **中文** ｜ [English](#english) ｜ [版本履历 Changelog](CHANGELOG.md)
 
@@ -11,7 +11,7 @@
 
 | | 地址 | 适合 |
 |---|---|---|
-| **在线版**（推荐先试） | <https://podcatcher962.github.io/copperlens/> | 浏览器直接打开，把板文件拖进去。**文件只在本机读取，不上传服务器**。读不了设计库（`.ddb`） |
+| **在线版**（推荐先试） | <https://podcatcher962.github.io/tracewisp/> | 浏览器直接打开，把板文件拖进去。**文件只在本机读取，不上传服务器**。读不了设计库（`.ddb`） |
 | **桌面版 exe** | [Releases](../../releases) 里下载，约 9 MB | **Win 10 / 11，32 位 64 位都能跑**。**能读设计库 `.ddb`**（自动抽出里面所有板子） |
 
 ![查线](预览_查线.png)
@@ -765,7 +765,7 @@ GPL-2.0 §3(b) 的三年书面源码要约写在 `第三方组件与许可.txt` 
 
 | # | 事项 | 现状 | 说明 |
 |---|---|---|---|
-| 1 | 产品名里不含任何厂商 / 软件名 | ✅ 已做 | 叫 `PCB 看板 / CopperLens`。窗口标题、图标名、exe 名、文件夹名都不带 |
+| 1 | 产品名里不含任何厂商 / 软件名 | ✅ 已做 | 叫 `亮线 TraceWisp`。窗口标题、图标名、exe 名、文件夹名都不带 |
 | 2 | 厂商名只出现在"能读什么"的描述里 | ✅ 已做 | 只留格式自身魔数 `PCB 4.0 Binary File` 和扩展名 `.pcb / .ddb` —— 这是**描述性使用**（说明兼容性所必需），不是当商标用 |
 | 3 | 不出现厂商图标 / 字体 / 界面素材 | ✅ 已做 | 全自绘，零外部资源 |
 | 4 | 免责声明里写明"无隶属关系、商标归各自所有者" | ✅ 已做 | 免责声明第 5 节 + 关于 |
@@ -775,7 +775,7 @@ GPL-2.0 §3(b) 的三年书面源码要约写在 `第三方组件与许可.txt` 
 | 8 | 不要把公司真实板子 / 客户资料放进仓库 | ⚠️ 自己把关 | 生产板的 PCB 文件属公司资产，示例请用开源板或纯自制 |
 | 9 | 免责声明写清"仅供参考、不得作生产依据、维修自负" | ✅ 已做 | 免责声明第 1/3/4 节，中英各一份 |
 | 10 | 签名 / 证书 | — | 无代码签名，SmartScreen 可能提示"未知发布者"；内部分发属正常，对外分发可忽略或自行签 |
-| 11 | 名字是否与在用品牌冲突 | ⚠️ 待定 | `CopperLens` 与一个同名海外 AI 服务重名（非 PCB 行业）。**品类不同、商标上难构成混淆**，但搜索会被对方占满。要清爽就换名 |
+| 11 | 名字是否与在用品牌冲突 | ✅ 2026-11-17 已改名 | 旧名 `CopperLens` 撞两样东西：① `copper lens` 是太阳镜镜片的品类词（Cocoons 等厂商的 Copper Lens System），海外搜索永远打不过；② 同赛道已有 **Copper for iOS**（copper-app.com，在 iPhone/iPad 上读 EAGLE 文件、查信号连接），`Copper = PCB 查看器`的联想被它占住。已改为 **亮线 / TraceWisp**，四项检索全空 |
 | 12 | exe / 源码里是否夹带本机信息 | ✅ 已验证 | **只对一类较真：能串到「你是谁」的** —— 真实姓名（Windows 用户名、姓名拼音、中文名）、手机、邮箱、身份证、公司名、客户名、token，对 `PCB看板.exe` 与全部源文件检索：**全部 0 次**。**盘符与目录不算隐私**（`E://workbuddy//…`、`C://Users//…`、`Desktop`、`Program Files`）：这类是技术噪音，拿不到身份锚点，换任何工具都一样，不必紧张。唯一例外是**路径里嵌了公司名或客户名**（例如 `E://XX公司//维修资料//`）—— 那就不是路径问题了，是别人的商业信息，必须清掉 |
 | 13 | 仓库里不要提交的东西 | ⚠️ 上传时注意 | 设计库 `.ddb`、`build/`、`_t/`、`_py32/`、`_archive/`、`*.exe` 走 Release 而非源码树 |
 
@@ -799,7 +799,7 @@ GPL-2.0 §3(b) 的三年书面源码要约写在 `第三方组件与许可.txt` 
 全文见仓库根目录 [`LICENSE`](LICENSE)。
 
 著作权 © 永远的兰兰 Lanlan Eternal
-项目地址 <https://github.com/podcatcher962/copperlens>
+项目地址 <https://github.com/podcatcher962/tracewisp>
 
 这意味着你可以自由地使用、修改、分发它，**包括用在商业场合** —— 拿它接活修板、
 装进公司的维修工位、把它打包进付费服务，都不需要另外征求同意。同时带来两条对等义务：
@@ -822,7 +822,7 @@ GPL-2.0 §3(b) 的三年书面源码要约写在 `第三方组件与许可.txt` 
   且不得放到需要逐层展开目录、或全文搜索才找得到的角落。这三处属于 GPL-3.0
   第 1 条所说的「适当法律声明」（Appropriate Legal Notices）。
 - **内容**：原作者「永远的兰兰（Lanlan Eternal）」以及项目地址
-  `https://github.com/podcatcher962/copperlens`。
+  `https://github.com/podcatcher962/tracewisp`。
 - **不许怎么做**：删除、缩写、弱化成「基于某开源项目」这类不具名表述，
   或者换成别人的名字。
 
@@ -835,7 +835,7 @@ GPL-2.0 §3(b) 的三年书面源码要约写在 `第三方组件与许可.txt` 
 
 ### 名称与标识
 
-「CopperLens / PCB 看板」是这个项目的名字，GPL 授权的是**代码**，不包括名称与图标。
+「亮线 TraceWisp」是这个项目的名字，GPL 授权的是**代码**，不包括名称与图标。
 
 **本许可不授予任何名称或商标的使用权**（GPL-3.0 第 7(e) 条：著作权人可以拒绝
 在商标法下授予权利）。想 Fork 出去单独发布，请换一个名字，别让用户误以为是
@@ -877,7 +877,7 @@ GPL-3.0 与它们互不影响：mdbtools 是独立进程调用，不属于衍生
 
 # English
 
-**English** ｜ [中文](#pcb-看板--copperlens-v116) ｜ [Changelog](CHANGELOG.md)
+**English** ｜ [中文](#亮线-tracewisp-v1242) ｜ [Changelog](CHANGELOG.md)
 
 A **read-only** PCB viewer for repair work. Click a trace or a pad and the whole net lights
 up in yellow, with the actual pin names right there in the status bar — `U100-4 / C102-1`,
@@ -889,7 +889,7 @@ One portable exe, **Windows 10 / 11, 32-bit and 64-bit** — double-click and go
 
 | | Where | Good for |
 |---|---|---|
-| **Web version** (try this first) | <https://podcatcher962.github.io/copperlens/> | Open in a browser, drop a `.pcb` in. **The file is read locally, never uploaded.** Cannot read design databases (`.ddb`) |
+| **Web version** (try this first) | <https://podcatcher962.github.io/tracewisp/> | Open in a browser, drop a `.pcb` in. **The file is read locally, never uploaded.** Cannot read design databases (`.ddb`) |
 | **Desktop exe** | Download from [Releases](../../releases), ~9 MB | **Win 10 / 11, 32-bit and 64-bit**, no install. **Reads `.ddb` design databases** (all boards inside, automatically) |
 
 ![Tracing a net](预览_查线.png)
@@ -1605,7 +1605,7 @@ Checked before any distribution (colleague, chat group, intranet share, GitHub):
 
 | # | Item | Status | Note |
 |---|---|---|---|
-| 1 | Product name contains no vendor / software name | ✅ | It is `PCB 看板 / CopperLens`. Window title, icon name, exe name, folder name — all clean |
+| 1 | Product name contains no vendor / software name | ✅ | It is `亮线 TraceWisp`. Window title, icon name, exe name, folder name — all clean |
 | 2 | Vendor names appear only in "what it reads" | ✅ | Only the format's own magic string `PCB 4.0 Binary File` and the extensions `.pcb / .ddb` — **descriptive use**, needed to state compatibility, not trademark use |
 | 3 | No vendor icons / fonts / UI assets | ✅ | Everything hand-drawn, zero external assets |
 | 4 | Disclaimer states non-affiliation and trademark ownership | ✅ | Disclaimer section 5 + About |
@@ -1615,7 +1615,7 @@ Checked before any distribution (colleague, chat group, intranet share, GitHub):
 | 8 | No real company boards or customer data in the repo | ⚠️ | Production PCB files belong to the employer; use open-hardware or self-made sample boards |
 | 9 | Disclaimer: reference only, not for production, repair at your own risk | ✅ | Disclaimer sections 1 / 3 / 4, in both languages |
 | 10 | Signing / certificate | — | Unsigned; SmartScreen may warn. Normal for internal use |
-| 11 | Name collision with an existing brand | ⚠️ | `CopperLens` collides with an unrelated overseas AI service (not PCB). Different category, unlikely to confuse; search results will favour them. Rename if that matters |
+| 11 | Name collision with an existing brand | ✅ Renamed 2026-11-17 | Old name `CopperLens` collided twice: (a) `copper lens` is a sunglass-tint category term (Cocoons and others sell a "Copper Lens System"); (b) **Copper for iOS** (copper-app.com) is a same-category product — it opens EAGLE files on iPhone/iPad and inspects signals, so "Copper = PCB viewer" is already taken. Renamed to **TraceWisp / 亮线**; all four name checks came back empty |
 | 12 | Machine paths / user names in the exe or source | ✅ | **Only one class is taken seriously: anything that leads back to who you are** — real name (Windows user name, pinyin, Chinese name), phone, e-mail, national ID, employer, client names, tokens. `PCB看板.exe` and every source file searched: **0 hits**. **Drive letters and folders do not count as privacy** (`E://workbuddy//…`, `C://Users//…`, `Desktop`, `Program Files`): that is technical noise with no identity anchor, identical whichever tool you use — not worth worrying about. The one exception is **a path that embeds an employer or client name** (e.g. `E://ACME-Client//repair//`) — that is no longer a path issue but someone else's business information, and must be stripped |
 | 13 | What must not be committed | ⚠️ | Design databases, `build/`, `_t/`, `_py32/`, `_archive/`, `*.exe` — binaries go to Releases, not the source tree |
 
@@ -1633,7 +1633,7 @@ This project's source is released under the **GNU General Public License, versio
 later (GPL-3.0-or-later)**. The full text is in [`LICENSE`](LICENSE) at the repository root.
 
 Copyright © 永远的兰兰 Lanlan Eternal
-Project URL: <https://github.com/podcatcher962/copperlens>
+Project URL: <https://github.com/podcatcher962/tracewisp>
 
 You are free to use, modify and redistribute it, **commercially too** — repairing boards
 for paying customers, putting it on a shop-floor workstation, bundling it into a paid
@@ -1662,7 +1662,7 @@ Concretely:
   nested folders or searching the whole text. These count as the "Appropriate Legal
   Notices" defined in §1 of GPL-3.0.
 - **What**: the author, 永远的兰兰 (Lanlan Eternal), plus the project URL
-  `https://github.com/podcatcher962/copperlens`.
+  `https://github.com/podcatcher962/tracewisp`.
 - **What not to do**: delete it, abbreviate it, water it down into an anonymous
   "based on an open-source project", or replace it with someone else's name.
 
@@ -1677,7 +1677,7 @@ both here and in the in-app About box, so it travels with the program.
 
 ### Name and marks
 
-"CopperLens / PCB 看板" is this project's name. The GPL covers the **code**, not the
+"TraceWisp / 亮线" is this project's name. The GPL covers the **code**, not the
 name or the icons.
 
 **This licence grants no right to use the name or any trademark** (GPL-3.0 §7(e): the

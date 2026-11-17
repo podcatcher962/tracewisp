@@ -7,7 +7,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5,user-scalable=yes">
 <title>铜迹 TraceWisp — PCB 走线查看器 · 只读查线</title>
 <style>
   :root{
@@ -16,13 +16,13 @@
     --accent:#f0b429; --accent2:#4a8ee8; --danger:#e2504f; --ok:#4caf7d;
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  html,body{height:100%}
+  html,body{height:100%;height:100dvh}
   body{
     background:var(--bg); color:var(--fg); overflow:hidden;
     font:13px/1.5 "Microsoft YaHei","PingFang SC",system-ui,sans-serif;
     -webkit-font-smoothing:antialiased;
   }
-  #app{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:210px 1fr;height:100%}
+  #app{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:210px 1fr;height:100%;height:100dvh}
   /* 没载入板子时：左侧栏是空的、方向键也没用，收起来让首页占满 */
   #app.empty{grid-template-columns:0 1fr}
   /* 收窄到 0：必须保留 aside 在网格里占着第一列，否则 stage 会滑到 0 宽那一列上 */
@@ -218,7 +218,15 @@
   .hint .home .feats span{background:var(--panel2);border:1px solid var(--line);color:var(--fg2);
     font-size:11.5px;padding:3px 10px;border-radius:20px}
   .hint .drop{border:2px dashed var(--line);border-radius:14px;padding:34px 56px;
-    transition:.15s}
+    transition:.15s;cursor:pointer}
+  /* 手机上拖不动手指 —— 整块就是「选文件」按钮，字放大、加个图标 */
+  @media (hover:none){
+    .hint .drop{padding:30px 18px;border-width:2.5px}
+    .hint .drop .big{font-size:0}
+    .hint .drop .big::before{content:"\1F4C2";display:block;font-size:34px;
+      line-height:1;margin-bottom:12px}
+    .hint .drop .big::after{content:"点这里选板文件";font-size:23px;letter-spacing:1px}
+  }
   .hint.over .drop{border-color:var(--accent);background:#f0b42910}
   .hint kbd{background:var(--panel2);border:1px solid var(--line);border-radius:4px;
     padding:1px 6px;font-family:inherit;font-size:12px;color:var(--fg)}
@@ -445,7 +453,7 @@
     header .spacer{flex:0 0 2px}
     .menu{margin-left:0}
     .mbtn{font-size:11.5px;padding:3px 6px}
-    .btn{padding:4px 9px;font-size:12px;flex:none}
+    .btn{padding:8px 13px;font-size:13.5px;flex:none;min-height:36px;display:inline-flex;align-items:center}
     .sep{flex:none}
     .findwrap{width:150px;flex:none}
     .tabs{height:26px;margin:4px -8px -6px}
@@ -467,7 +475,7 @@
     .tbar{display:flex;position:absolute;left:8px;right:8px;bottom:8px;gap:6px;z-index:9}
     .tbar button{flex:1 1 0;min-width:0;padding:9px 2px 8px;border-radius:10px;
       background:#1b2029e8;border:1px solid #333b4a;color:#c3ccda;font-family:inherit;
-      font-size:11.5px;line-height:1.2;cursor:pointer;backdrop-filter:blur(4px);
+      font-size:13.5px;line-height:1.25;cursor:pointer;backdrop-filter:blur(4px);
       display:flex;flex-direction:column;align-items:center;gap:3px;
       transition:.12s;-webkit-tap-highlight-color:transparent}
     .tbar button .g{font-size:16px;line-height:1}
@@ -10892,6 +10900,9 @@ function ackShow(){
       go.disabled=true;
       ackWrite().then(function(){
         if(mo){ mo.dataset.ok="1"; mo.classList.remove("show"); }
+        /* 手机上地址栏进来出去会改可视高度；弹窗收掉不重排，
+           主界面就会有一部分留在屏幕外（用户实测：退出重进才正常）。 */
+        try{ window.dispatchEvent(new Event("resize")); }catch(_){}
       });
     };
   }
@@ -13004,6 +13015,16 @@ document.getElementById("drwCsv").onclick = ()=>{
 /* ============================== 板上标记（标注） ==============================
    维修时"这里烧过""测过电压正常"这类结论，写在自己板子上最省事。
    参照同类工具的做法：右键点板子加标注、随板子存档、换板不串。 */
+/* 触屏上没有"拖"这回事：点一下整块提示区就去选文件。
+   桌面端也一起生效 —— 那块虚线框本来就是最显眼的入口，能点比只能拖好。
+   input 必须已经挂在文档里，iOS Safari 才认 .click()。 */
+document.addEventListener("click", function(e){
+  const z = e.target && e.target.closest ? e.target.closest(".drop") : null;
+  if(!z) return;
+  const f = document.getElementById("file");
+  if(f) f.click();
+});
+
 /* ---- 本机小存储（板上标记 / 档案）----------------------------------------
    exe 每次开的是随机端口，origin 一变 localStorage 就空 —— 标记和档案
    关掉窗口就没了。所以这边走 /api/kv 落文件（%LOCALAPPDATA%\CopperLens\store.json），

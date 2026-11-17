@@ -48,7 +48,7 @@ from ctypes import wintypes
 from pathlib import Path
 
 APP_TITLE = "铜迹 TraceWisp"
-VERSION = "1.25.1"
+VERSION = "1.25.2"
 
 # 认自己窗口时看的标题关键词。改名之前/之后都收，老用户的更新包不会认不到自己的窗口。
 _SELF_TITLES = ("铜迹", "TraceWisp", "CopperLens", "PCB 看板")
@@ -736,14 +736,15 @@ def ask_file():
     except Exception:
         pass
     buf = ctypes.create_unicode_buffer(32768)
-    filt = L("所有板文件 (*.pcb;*.ddb;*.kicad_pcb;*.brd;*.bvr;*.bv;*.bdv;*.cad;*.json;*.gbr;*.asc;*.PcbDoc;*.zip)"
+    filt = L("所有板文件 (*.pcb;*.ddb;*.kicad_pcb;*.brd;*.bvr;*.bv;*.bdv;*.cad;*.json;*.gbr;*.asc;*.PcbDoc;*.xml;*.zip)"
              "\0*.pcb;*.ddb;*.kicad_pcb;*.brd;*.bvr;*.bv;*.bdv;*.cad;*.json;*.epro;*.epro2;"
-             "*.gbr;*.gtl;*.gbl;*.gko;*.drl;*.asc;*.PcbDoc;*.pcbdoc;*.zip\0"
+             "*.gbr;*.gtl;*.gbl;*.gts;*.gbs;*.gto;*.gbo;*.gko;*.gm1;*.gml;*.gtp;*.gpi;*.pho;*.art;*.drl;*.xln;*.txt;*.asc;*.PcbDoc;*.pcbdoc;*.xml;*.zip\0"
              "设计库 (*.ddb)\0*.ddb\0"
              "板文件 (*.pcb)\0*.pcb\0"
              "KiCad 板文件 (*.kicad_pcb)\0*.kicad_pcb\0"
              "PADS 板文件 (*.asc)\0*.asc\0"
              "Altium 板文件 (*.PcbDoc;*.pcbdoc)\0*.PcbDoc;*.pcbdoc\0"
+             "IPC-2581 制造数据 (*.xml)\0*.xml\0"
              "Eagle / 点位图 (*.brd)\0*.brd\0"
              "维修点位图 (*.bvr;*.bv;*.bdv;*.cad)\0*.bvr;*.bv;*.bdv;*.cad\0"
              "立创EDA 标准版 (*.json)\0*.json\0"
@@ -752,14 +753,15 @@ def ask_file():
              "\0*.gbr;*.gtl;*.gbl;*.gts;*.gbs;*.gto;*.gbo;*.gko;*.drl;*.xln;*.zip\0"
              "ODB++ 制造数据 (*.zip;*.tgz;*.tar)\0*.zip;*.tgz;*.tar\0"
              "所有文件 (*.*)\0*.*\0\0",
-             "All board files (*.pcb;*.ddb;*.kicad_pcb;*.brd;*.bvr;*.bv;*.bdv;*.cad;*.json;*.gbr;*.asc;*.PcbDoc;*.zip)"
+             "All board files (*.pcb;*.ddb;*.kicad_pcb;*.brd;*.bvr;*.bv;*.bdv;*.cad;*.json;*.gbr;*.asc;*.PcbDoc;*.xml;*.zip)"
              "\0*.pcb;*.ddb;*.kicad_pcb;*.brd;*.bvr;*.bv;*.bdv;*.cad;*.json;*.epro;*.epro2;"
-             "*.gbr;*.gtl;*.gbl;*.gko;*.drl;*.asc;*.PcbDoc;*.pcbdoc;*.zip\0"
+             "*.gbr;*.gtl;*.gbl;*.gts;*.gbs;*.gto;*.gbo;*.gko;*.gm1;*.gml;*.gtp;*.gpi;*.pho;*.art;*.drl;*.xln;*.txt;*.asc;*.PcbDoc;*.pcbdoc;*.xml;*.zip\0"
              "Design library (*.ddb)\0*.ddb\0"
              "Board file (*.pcb)\0*.pcb\0"
              "KiCad board (*.kicad_pcb)\0*.kicad_pcb\0"
              "PADS board (*.asc)\0*.asc\0"
              "Altium board (*.PcbDoc;*.pcbdoc)\0*.PcbDoc;*.pcbdoc\0"
+             "IPC-2581 fabrication data (*.xml)\0*.xml\0"
              "EAGLE / boardview (*.brd)\0*.brd\0"
              "Repair boardview (*.bvr;*.bv;*.bdv;*.cad)\0*.bvr;*.bv;*.bdv;*.cad\0"
              "EasyEDA standard (*.json)\0*.json\0"
@@ -1544,6 +1546,23 @@ def _payload_for_path(p):
         return {"boards": [{"n": p.name,
                             "d": base64.b64encode(raw).decode("ascii")}],
                 "ddb": False, "file": p.name, "kicad": True}
+    if ext == ".xml":
+        # IPC-2581（Allegro / Xpedition / PADS 都导得出）。.xml 这个扩展名太宽泛，
+        # 先看根元素；不是 IPC-2581 就说清楚，别让人对着「认不出」猜。
+        raw = p.read_bytes()
+        head = raw[:4096].decode("utf-8", "replace").lstrip("\ufeff \t\r\n")
+        if "<IPC-2581" not in head and "<IPC2581" not in head:
+            return {"error": L(
+                "这个 .xml 不是 IPC-2581 制造数据。\n\n"
+                "铜迹只读 IPC-2581 这一种 XML —— 原理图、网表、BOM 之类的 XML 读不了。\n"
+                "板子在 Allegro / Xpedition / PADS 里的话，导出时选 IPC-2581。",
+                "This .xml is not IPC-2581 fabrication data.\n\n"
+                "TraceWisp reads only IPC-2581 among XML files — schematic, netlist and BOM "
+                "XML are not supported.\n"
+                "If the board lives in Allegro / Xpedition / PADS, export it as IPC-2581.")}
+        return {"boards": [{"n": p.name,
+                            "d": base64.b64encode(raw).decode("ascii")}],
+                "ddb": False, "file": p.name}
     if ext in (".bvr", ".bv", ".bdv", ".cad"):
         # 维修点位图。扩展名在这一族里并不严格（同一个 .cad 有多种写法），
         # 所以不在这里卡太死 —— 认不出来也照送，让页面给出人话。
@@ -2124,6 +2143,23 @@ def handle(path):
     ext = p.suffix.lower()
     log("handle %s (%d 字节)" % (p, p.stat().st_size))
 
+    if ext == ".xml":
+        raw = p.read_bytes()
+        head = raw[:4096].decode("utf-8", "replace").lstrip("\ufeff \t\r\n")
+        if "<IPC-2581" not in head and "<IPC2581" not in head:
+            msgbox(L(
+                "这个 .xml 不是 IPC-2581 制造数据。\n\n"
+                "铜迹只读 IPC-2581 这一种 XML —— 原理图、网表、BOM 之类的 XML 读不了。\n"
+                "板子在 Allegro / Xpedition / PADS 里的话，导出时选 IPC-2581。",
+                "This .xml is not IPC-2581 fabrication data.\n\n"
+                "TraceWisp reads only IPC-2581 among XML files — schematic, netlist and BOM "
+                "XML are not supported.\n"
+                "If the board lives in Allegro / Xpedition / PADS, export it as IPC-2581."))
+            return False
+        html = build_view_html([(p.name, raw)], p.name)
+        _remember(str(p), {"boards": [{"n": p.name}]})
+        return open_viewer(html) is not None
+
     if ext in (".pcb", ".kicad_pcb"):
         html = build_view_html([(p.name, p.read_bytes())], p.name)
         _remember(str(p), {"boards": [{"n": p.name}]})
@@ -2345,7 +2381,7 @@ def _is_board_arg(a):
         return True
     return low.endswith((".ddb", ".pcb", ".kicad_pcb", ".brd", ".json",
                          ".epro", ".epro2", ".zip", ".tgz", ".tar", ".tar.gz",
-                         ".bvr", ".bv", ".bdv", ".cad", ".asc", ".pcbdoc"))
+                         ".bvr", ".bv", ".bdv", ".cad", ".asc", ".pcbdoc", ".xml"))
 
 
 def main():
@@ -2364,7 +2400,7 @@ def main():
              if not t.lower().endswith((".ddb", ".pcb", ".kicad_pcb", ".brd",
                                         ".json", ".epro", ".epro2", ".zip",
                                         ".tgz", ".tar", ".tar.gz",
-                                        ".bvr", ".bv", ".bdv", ".cad", ".asc", ".pcbdoc"))]
+                                        ".bvr", ".bv", ".bdv", ".cad", ".asc", ".pcbdoc", ".xml"))]
     if len(plain) >= 2:
         memb = []
         for t in plain:

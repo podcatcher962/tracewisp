@@ -530,7 +530,7 @@
     <div class="hrow">
       <button class="btn primary" id="open" data-i18n="btnOpen"
               data-i18n-title="btnOpenTip">打开文件</button>
-      <input type="file" id="file" accept=".pcb,.PCB,.ddb,.DDB,.kicad_pcb,.KICAD_PCB,.brd,.BRD,.bvr,.BVR,.bv,.BV,.bdv,.BDV,.cad,.CAD,.gbr,.GBR,.gtl,.gbl,.gts,.gbs,.gto,.gbo,.gko,.drl,.xln,.zip,.ZIP,.json,.JSON,.epro,.EPRO,.epro2,.EPRO2,.PcbDoc,.PCBDOC,.pcbdoc" multiple>
+      <input type="file" id="file" accept=".pcb,.ddb,.kicad_pcb,.brd,.bvr,.bv,.bdv,.cad,.asc,.pcbdoc,.xml,.gbr,.gtl,.gbl,.gts,.gbs,.gto,.gbo,.gko,.gm1,.gml,.gmb,.gtp,.gbp,.pho,.art,.gbx,.drl,.xln,.nc,.ncd,.exc,.txt,.gpi,.zip,.json,.epro,.epro2,.PcbDoc" multiple>
       <select id="boards" style="display:none"></select>
       <div class="sep"></div>
       <button class="btn" id="fit" data-i18n="btnFit" data-i18n-title="btnFitTip">适合窗口</button>
@@ -1329,7 +1329,7 @@ zh:{
        未随本许可授予任何名称或商标的使用权（第 7(e) 条）。Fork 出去单独发布
        请换个名字，避免用户误认。</p>
     <h3>版本</h3>
-    <p>v1.25.1　·　Windows 10 / 11，32 位 64 位都支持　·　单文件便携版　·　手机扫码看板</p>
+    <p>v1.25.2　·　Windows 10 / 11，32 位 64 位都支持　·　单文件便携版　·　手机扫码看板</p>
     <div class="sig">© 永远的兰兰　·　Lanlan Eternal</div>`
 },
 en:{
@@ -2002,7 +2002,7 @@ en:{
     <p class="dim">This licence grants rights to the code only. The names "TraceWisp" and "铜迹" and the icons come with no name or trademark licence (§7(e)). Please pick
        a different name if you fork and publish separately.</p>
     <h3>Version</h3>
-    <p>v1.25.1　·　Windows 10 / 11, 32-bit and 64-bit　·　portable single file　·　phone via QR</p>
+    <p>v1.25.2　·　Windows 10 / 11, 32-bit and 64-bit　·　portable single file　·　phone via QR</p>
     <div class="sig">© Lanlan Eternal　·　永远的兰兰</div>`
 }
 };
@@ -6593,7 +6593,7 @@ function parseBoardView(buf, kind){
 const ODB_MM = 39.37007874015748;          /* 1 mm = 39.37 mil */
 
 function odbName(f){
-  return String((f && f.name) || "").replace(/\\/g, "/").replace(/^\.?\/+/, "");
+  return String((f && (f.name || f.n)) || "").replace(/\\/g, "/").replace(/^\.?\/+/, "");
 }
 function odbStr(rec){
   if(!rec || !rec.buf) return "";
@@ -11744,7 +11744,7 @@ async function uploadToServer(f){
   const nm=f.name||"board.pcb";
   /* 后缀只是一道粗筛：板厂给的 Gerber 包常常没后缀，光看名字会把好东西挡在门外。
      真正的判断交给 exe 那侧（它按内容嗅 + 按 zip 内部结构认工程包）。 */
-  if(!/\.(pcb|ddb|kicad_pcb|brd|bvr|bv|bdv|cad|json|epro|epro2|zip)$/i.test(nm) && !GER_EXT.test(nm)){
+  if(!/\.(pcb|ddb|kicad_pcb|brd|bvr|bv|bdv|cad|asc|pcbdoc|xml|json|epro|epro2|zip)$/i.test(nm) && !GER_EXT.test(nm)){
     toast(T("noPcb")); return;
   }
   toast(T("reading"));
@@ -11815,7 +11815,7 @@ document.getElementById("hint").addEventListener("click", e=>{
   if(e.target.closest("#hintOpen")) openAny();
 });
 document.getElementById("file").onchange=e=>{
-  const fs=e.target.files;
+  const fs=[...e.target.files];   /* 先固化成数组：下一行 value="" 会把 FileList 一起清空 */
   e.target.value="";          /* 清掉，否则同一个文件第二次选不触发 change */
   openFiles(fs);
 };
@@ -11915,7 +11915,7 @@ async function openFiles(list){
     const solo=[], ger=[], zips=[], easy=[];
     for(const f of arr){
       const n=f.name||"";
-      if(/\.(pcb|ddb|kicad_pcb|brd|bvr|bv|bdv|cad)$/i.test(n)){ solo.push(f); continue; }
+      if(/\.(pcb|ddb|kicad_pcb|brd|bvr|bv|bdv|cad|asc|pcbdoc|xml)$/i.test(n)){ solo.push(f); continue; }
       /* 立创EDA 专业版的工程包就是 zip，只是后缀改成 .epro / .epro2 */
       if(/\.(zip|epro|epro2)$/i.test(n)){ zips.push(f); continue; }
       if(GER_EXT.test(n)){ ger.push(f); continue; }
@@ -11960,11 +11960,35 @@ async function openFiles(list){
           }
           continue;
         }
+        /* ODB++ 包（板厂常给）：matrix/ + steps/<板>/layers/… 里面没有
+           「一层一个 gerber」那种文件，按 Gerber 过滤会把内容全丢掉。
+           所以整包按原路径交出去，由 parseOdb 读 matrix 与 features。 */
+        if(odbLooks(ents)){
+          const all=[];
+          for(const e of ents){
+            if(/\/$/.test(e.name)) continue;
+            let ab;
+            if(e.method===0){
+              ab=e.data.buffer.slice(e.data.byteOffset, e.data.byteOffset+e.data.byteLength);
+            }else{
+              ab=await inflateRaw(e.data);
+            }
+            if(ab) all.push({n:e.name, buf:ab});
+          }
+          if(all.length){
+            const nm=zf.name.replace(/\.[^.]+$/,"");
+            try{
+              toast(T("reading"));
+              openDoc([{n:nm, d:null, buf:null, g:all}], nm);
+            }catch(e){ toast(nm+" — "+(e&&e.message||e)); }
+          }
+          continue;
+        }
         const inner=[];
         for(const e of ents){
           if(/\/$/.test(e.name)) continue;
           const base=e.name.split(/[\\/]/).pop();
-          if(!GER_EXT.test(base) && !/\.(pcb|ddb|kicad_pcb|brd|bvr|bv|bdv|cad)$/i.test(base)) continue;
+          if(!GER_EXT.test(base) && !/\.(pcb|ddb|kicad_pcb|brd|bvr|bv|bdv|cad|asc|pcbdoc|xml)$/i.test(base)) continue;
           let ab;
           if(e.method===0){
             ab=e.data.buffer.slice(e.data.byteOffset, e.data.byteOffset+e.data.byteLength);
@@ -11974,8 +11998,8 @@ async function openFiles(list){
           if(!ab){ toast(T("zipNeedUnzip")); break; }
           inner.push({n:base, buf:ab});
         }
-        const g2=inner.filter(x=>!/\.(pcb|ddb|kicad_pcb|brd|bvr|bv|bdv|cad)$/i.test(x.n));
-        const s2=inner.filter(x=>/\.(pcb|ddb|kicad_pcb|brd|bvr|bv|bdv|cad)$/i.test(x.n));
+        const g2=inner.filter(x=>!/\.(pcb|ddb|kicad_pcb|brd|bvr|bv|bdv|cad|asc|pcbdoc|xml)$/i.test(x.n));
+        const s2=inner.filter(x=>/\.(pcb|ddb|kicad_pcb|brd|bvr|bv|bdv|cad|asc|pcbdoc|xml)$/i.test(x.n));
         for(const x of s2){
           openDoc([{n:x.n, d:null, buf:x.buf}], x.n);
           await new Promise(r=>setTimeout(r,300));

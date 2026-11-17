@@ -12,6 +12,133 @@
 
 ---
 
+## v1.25.2 真样本进来之后：文件在手里，程序却不认
+
+**十二家的清单没动，一个格式都没加。** 这一版改的全是「进门那一步」——
+解析器本来就会读，文件却在分拣时被丢了。自造样本测不出这类问题。
+
+### 起因
+
+阳台机把 12 种格式的真样本打了包（68 个文件、29 MB，附清单逐条标注了来源与「自制」）。
+用网页版的真实入口（`#file` 的 change → `openFiles`）逐条跑，撞出四件事。
+
+### 一、`.asc` / `.PcbDoc` / `.xml` 在门口就被丢掉
+
+拖进去只得到一句「认不出这个文件」。但直接在页面里问它自己的嗅探函数：
+
+| 样本 | `looksPads` / `looksAltium` / `looksIpc2581` | `parseAny()` |
+|---|---|---|
+| `pads/lcore2.asc` | `True` | 对象（2108 个） |
+| `altium/A_simple_box_in_green.PcbDoc` | `pcb` | 对象 |
+| `altium/FICO-44.pcbdoc`（ASCII） | `pcb` | 对象 |
+| `ipc2581/mgburr_led_power_board.xml` | `True` | 对象 |
+
+**解析器全认。** 问题在 `openFiles()` 的分拣正则：
+
+```js
+if(/\.(pcb|ddb|kicad_pcb|brd|bvr|bv|bdv|cad)$/i.test(n)){ solo.push(f); continue; }
+```
+
+`.asc`、`.pcbdoc`、`.xml` 三条都不匹配，往下走 Gerber 嗅探、立创嗅探也不匹配，
+于是被静默丢弃，最后统一报「认不出」。补上三个后缀即可（5 处，含手机把文件传给电脑那条）。
+
+### 二、ODB++ 的 zip 读不出铜层
+
+ODB++ 包长这样：`matrix/matrix` + `steps/<板>/layers/<层>/features`。
+`openFiles()` 的 zip 分支解开后，**只收 Gerber 后缀和板文件后缀**的条目，
+`features`、`tools`、`components`、`matrix` 一个都不匹配，全被丢光，
+于是走到「这个包是 ODB++，但没能读出铜层」那条提示。
+
+而且就算不丢，`parseGerberSet()` 开头的 `odbLooks(files)` 也判不出来 ——
+它用 `odbName(f)` 读 `f.name`，而 Gerber 包里的条目是用 `{n, buf}` 存的路径。
+
+两处一起修：
+
+```js
+/* odbName：两种都认 */
+String((f && (f.name || f.n)) || "")
+
+/* openFiles 的 zip 分支：认出 ODB++ 就整包交出，不按 Gerber 过滤 */
+if(odbLooks(ents)){ ... openDoc([{n:nm, d:null, buf:null, g:all}], nm); continue; }
+```
+
+### 三、网页版点「打开」反而打不开（最要命的一条）
+
+```js
+document.getElementById("file").onchange=e=>{
+  const fs=e.target.files;
+  e.target.value="";          /* 清掉，否则同一个文件第二次选不触发 change */
+  openFiles(fs);
+};
+```
+
+`e.target.value=""` 在 Chrome 里会把 **FileList 一起清空**，而 `fs` 拿的是同一个对象 ——
+`openFiles` 进去第一行 `[...list]` 得到空数组，直接 `toast(noPcb)`。
+
+也就是说：**网页版点「打开」选任何文件都不会有反应**，只有拖放是好的
+（拖放走 `drop` 事件，根本不经过这个 input）。拖放是主要用法，所以一直没人报。
+
+```js
+const fs=[...e.target.files];   /* 先固化成数组 */
+e.target.value="";
+openFiles(fs);
+```
+
+### 四、钻孔叫 `.TXT`，文件框里选不中
+
+阳台机特意提醒：rpi_can 那套的钻孔扩展名是 `.TXT`，不是 `.drl`。
+`accept` 和 exe 的 `OPENFILENAMEW` 过滤器都只写了 `.drl` / `.xln`，
+用户多选这套 Gerber 时，钻孔文件灰着选不中 —— 板子画出来没有孔。
+
+顺带把 Gerber 全家族补齐（`.gtp` 钢网、`.gml` 外形、`.gpi`、`.gm1`、`.pho`、`.art` 等）。
+
+### 五、exe 侧压根没接 IPC-2581
+
+`_is_board_arg()` 的白名单、`_payload_for_path()`、`handle()` 三处都没有 `.xml`。
+后果是：把 IPC-2581 拖到图标上，程序当它是无关参数，**静默进首页**，什么都不说。
+
+三处都补上，并且加一道内容判断（`<IPC-2581`）——
+`.xml` 太宽泛，别的 XML 进来要给人话，不能只说「认不出」。
+
+### 本版实测
+
+34 项真样本，33 项开图。唯一没开的 99SE `.ddb` 是设计如此（浏览器里没有 mdbtools）。
+
+| 样本 | 规模 | 结果 |
+|---|---|---|
+| Altium LimeSDR Mini 1v2（9.6 MB） | 10362 对象 / 覆铜 356 | 走线 7801 · 焊盘 1759 · 过孔 802 · 解析 66 ms |
+| 立创专业版 taishan.epro2 | 16036 对象 / 覆铜 2957 | 走线 12995 · 焊盘 1963 · 过孔 1078 · 网络 400 |
+| IPC-2581 tc10_assembly（3.7 MB） | 12765 对象 | 走线 5651 · 焊盘 3596 · 过孔 3518 · 网络 514 · 解析 151 ms |
+| 立创标准版 quark | 5377 对象 / 覆铜 282 | 走线 4376 · 焊盘 508 · 过孔 483 · 网络 100 |
+| Eagle pyboard（2 层） | 1637 对象 / 覆铜 2 | 走线 1205 · 焊盘 249 · 过孔 63 · 网络 68 · 解析 17 ms |
+| Eagle gainblock（6 层） | 301 对象 | 走线 56 · 焊盘 39 · 过孔 196 · 网络 14 |
+| KiCad v4 cantact | 759 对象 | 走线 585 · 焊盘 152 · 覆铜 7 |
+| KiCad v10 modern_esp32（4 层） | 972 对象 / 覆铜 20 | 走线 707 · 焊盘 201 · 过孔 64 |
+| PADS lcore2 | 2108 对象 / 覆铜 3 | 正常开图 |
+| Gerber rpi_can 整套（10 个文件，钻孔 `.TXT`） | 5350 对象 | 走线 4938 · 焊盘 412 · 106 个钻孔套进焊盘 |
+| Gerber dcf77 半套（钻孔只有表头） | 11651 对象 | 走线 11447 · 焊盘 204 · 不报错 |
+| ODB++ flat / mm / wrapped | 各 31 对象 | 走线 10 · 焊盘 18 · 过孔 3 · 网络 3，三者完全一致 |
+
+报错文案逐项核对（都对得上，不是「认不出」了事）：
+
+- PADS 网表 → 「这是 PADS 的网络表，只有连接关系，没有铜箔和器件」
+- IPC-2581 骨架（564 B）→ 「没读到铜箔，也没读到焊盘，多半是只导出了装配」
+- 0 字节空文件 → 「这个文件是空的（0 字节）」
+- 扩展名写错（Eagle 内容存成 `.kicad_pcb`）→ 按内容认出是 Eagle，正常开图
+- 维修点位图 → 「只存位号和网络，不存铜箔图形」的说明
+
+exe 侧（`_out1252b`，9,722,349 B，32 位）：
+
+- 解包比对：`index.html` 597,550 B，sha256 与本地一致；`mdbtools` 五个文件都在
+- 命令行四条路径实测：Altium / PADS / IPC-2581 / ODB++，窗口标题都带上了文件名
+- 单实例机制正常：第二个进程把文件交给已有窗口后自己退出（返回 0），不另开窗口
+
+### 一个教训
+
+这些 bug 有一个共同点：**都不是解析器算错了，而是文件没走到解析器**。
+所以「拿真样本逐条开」比「加断言」更有用 —— 断言只能证明测过的没坏，
+真样本能证明没测过的也没坏。
+
 ## v1.25.1 一个 TDZ 崩：板子只打开一半
 
 **v1.25 装出去之后，双击 exe 打开任何一块板都会碰到。**

@@ -1,5 +1,5 @@
 ════════════════════════════════════════════════════════════════
-  铜迹  TraceWisp   v1.25.1
+  铜迹  TraceWisp   v1.25.2
   只读查线工具   ·   Windows 10 / 11，32 位 64 位都支持   ·   免安装
   © 永远的兰兰   Lanlan Eternal
 ════════════════════════════════════════════════════════════════
@@ -311,6 +311,29 @@
 
   ★ 不认的：.SchDoc / .PcbLib（原理图和封装库，不是板子）、
     加密或加壳的板文件。
+
+
+【IPC-2581 的板子也能看（.xml）】
+
+  IPC-2581 是 IPC 协会定的开放格式，Allegro、Xpedition、PADS、Altium 都导得出。
+  它是 XML，后缀 .xml —— 但 .xml 太宽泛，程序会先看根元素，不是 IPC-2581 的
+  （原理图、网表、BOM）会直接说"这不是 IPC-2581"，而不是含糊地报认不出。
+
+  导出在哪（各家叫法不同）：
+      Cadence Allegro        Manufacture → IPC2581 In / Out
+      Siemens Xpedition      File → Export → IPC-2581
+      PADS Professional      File → Export → IPC-2581
+      Altium Designer        File → Export → IPC-2581
+
+  读出来的东西和 Altium 那档一样：走线、焊盘、过孔、覆铜、位号、网络名。
+
+  几点要知道的：
+      · 只认「制造数据」那一份。有些工具默认导出的是装配或 BOM 变体，
+        里面没有铜箔，程序会提示你改用完整导出，而不是给你一张空板
+      · 层名取自文件里的 layerRef，跟原软件里看到的一致
+      · 3.7 MB 的装配级文件也开得动（实测 12765 个对象、解析 151 毫秒）
+
+  ★ 不认的：原理图的 XML、网表 XML、BOM 的 XML。
 
 
 【格式就到这儿，不再加了】

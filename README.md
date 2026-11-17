@@ -114,6 +114,58 @@
 （越靠边越快，松手就停）；放大后**左上角缩略图**里的黄框是当前视野，点一下跳过去；
 板上**右键写一句话**就是一条标记，按板子存档。
 
+## v1.25.5 手机上「全都小得看不清」，问题不在字号
+
+**格式、解析、渲染一行没动。** 这一版只改触屏下的界面尺寸和手势，桌面窗口的尺寸一个没改。
+
+上一版（v1.25.4）修的是**板上标记和「档案」一关就没**：exe 每次启动都是随机端口，
+浏览器按 origin 隔离数据，所以每次读到的都是空的。现在改存
+`%LOCALAPPDATA%\CopperLens\store.json`，关掉再开、换板都不丢。
+
+这一版修的是手机上打开在线版的三个反馈：整体偏小、左上角「打开文件」太小、
+双指缩放没用。
+
+### 小，是因为页面被当成了「电脑版网站」
+
+真机截图上顶栏高约 102 个图像像素。同一份页面按 412 的视口量是 87，按 980 量是 78 ——
+1280 ÷ 980 × 78 ≈ 102，正好对上；按 412 算应该是 270。另一条证据更直接：窄屏样式里
+本来写着要藏掉 `TraceWisp` 和 `© 永远的兰兰`，截图里两个都在。
+
+也就是说：浏览器按 980 的宽度排版，再整体缩到屏幕宽的 0.42 倍贴上来。
+**所有按像素写的东西一起被缩掉了 2.4 倍**，字号写多大都没用。
+
+改法是算一个系数，不猜设备类型：
+
+```js
+--mobk = 布局视口宽 ÷ 屏幕 CSS 宽      // 正常手机 1.0、电脑版模式 2.38、iPad 1.0
+```
+
+触屏下的尺寸都写成 `calc(基准px × var(--mobk))`，三种情况一份规则通吃。
+
+### 手机上的三个入口都改了
+
+| | 改前 | 改后 |
+|---|---|---|
+| 中间虚线框 | 「把板文件拖到这里」—— 手机上拖不动，点了没反应 | **实心大按钮「选择板文件」**，整块框可点，56px 高 |
+| 顶部「打开文件」 | 12px 字 | 13.5px 字、最小高 36px |
+| 底部全宽「打开」 | 和中间按钮重复 | 空状态隐藏，只留一个入口 |
+| 免责弹窗 | 复选框 6px、同意键挤在右下角 | 复选框 22px、**同意键整宽**、正文 14px |
+| 双指缩放 | 首屏完全没用 | 首屏、弹窗、载板后都能缩放 |
+
+为什么双指缩放原来没用：空状态时 `main/canvas` 上写着 `touch-action:none`（本来是为了
+不让浏览器抢走画布手势），而画布自己的捏合代码开头是 `if(!B) return`。
+**两头都不管**，所以首屏既缩放不了页面、也缩放不了图。
+
+### 实测
+
+- 首屏 412 / 980 两种尺寸各 14 项，全过（含点提示区真能弹出文件选择）
+- 载板后 412 / 980 各 6 项，单指拖动与双指缩放（板子 ×3.25）全过
+- 免责弹窗在 360×640 / 412×845 / 640×360 / 980×1611 四种尺寸下均不越界，
+  弹窗打开时双指缩放从 1 到 5
+- iPad 竖横两种方向 `--mobk` 都是 1.0，字号没被撑大
+
+---
+
 ## v1.25.3 免责从「挂在菜单里」变成「进来先看到」
 
 **格式、解析、渲染一行没动。** 这一版只改一件事：第一次打开必须先读免责、点同意。
@@ -1167,6 +1219,62 @@ Mouse: the wheel zooms **anchored at the pointer**; **drag to the edge of the ca
 view keeps moving that way** (faster the closer you get, stops when you let go); once zoomed
 in, the **mini-map in the top-left** shows your viewport as a yellow box — click to jump;
 **right-click on the board writes a note**, saved per board.
+
+## What's new in v1.25.5 — "everything is tiny on my phone" was not a font-size problem
+
+**Formats, parsing and rendering untouched.** This release only changes touch-screen
+sizing and gestures; desktop-window dimensions are exactly as before.
+
+The previous release (v1.25.4) fixed **board marks and log entries disappearing on close**:
+the exe picked a random port on every start, and browsers isolate storage per origin, so
+every launch read an empty store. They now live in
+`%LOCALAPPDATA%\\CopperLens\\store.json`.
+
+### The page was being laid out as a desktop site
+
+On the real-device screenshot the header is about 102 image pixels tall. The same page
+measures 87 CSS at a 412 layout viewport and 78 CSS at 980 — and 1280 ÷ 980 × 78 ≈ 102,
+while 412 would give 87 × 3.1 ≈ 270. The second clue is decisive: the narrow-screen rules
+hide the `TraceWisp` wordmark and `© 永远的兰兰`, yet both were visible in the screenshot.
+
+So the browser laid the page out at 980 wide and shrank it by 412/980 = 0.42 before
+painting it. **Every pixel value was scaled down by 2.4×** — no font size would have helped.
+
+The fix computes one factor instead of guessing at device types:
+
+```js
+--mobk = layout viewport width / screen CSS width   // phone 1.0, desktop-mode 2.38, iPad 1.0
+```
+
+Every touch-screen dimension is written as `calc(base px × var(--mobk))`, so one rule set
+covers all three cases.
+
+### The three entry points on a phone
+
+| | Before | After |
+|---|---|---|
+| Drop area | "Drag the board file here" — there is no drag-and-drop on a phone | **Solid button "Choose board file"**, whole box tappable, 56px tall |
+| Header "Open file" | 12px | 13.5px, min height 36px |
+| Bottom "Open" bar | Duplicated the middle button | Hidden in the empty state |
+| Disclaimer dialog | 6px checkbox, button squeezed bottom-right | 22px checkbox, **full-width button**, 14px body |
+| Pinch zoom | Did nothing on the start screen | Works on the start screen, in the dialog, and after loading a board |
+
+Pinch zoom was dead because `main/canvas` carried `touch-action:none` in the empty state
+(to keep the browser from stealing canvas gestures), while the canvas pinch handler begins
+with `if(!B) return`. **Neither side handled it**, so the start screen could not be scaled
+at all.
+
+### What was actually tested
+
+- Start screen at 412 and 980: 14 checks each, all passing (including that tapping the
+  hint really opens the file picker)
+- After loading a board at 412 and 980: 6 checks each — one-finger pan and pinch
+  (board ×3.25) all passing
+- Disclaimer dialog at 360×640 / 412×845 / 640×360 / 980×1611: never overflows the
+  viewport; pinch inside the dialog goes from 1 to 5
+- iPad portrait 768 and landscape 1024: `--mobk` stays 1.0, text is not blown up
+
+---
 
 ## What's new in v1.25.3 — the disclaimer is in your face now, not buried in a menu
 

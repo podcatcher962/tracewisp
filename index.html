@@ -1448,7 +1448,7 @@ zh:{
        未随本许可授予任何名称或商标的使用权（第 7(e) 条）。Fork 出去单独发布
        请换个名字，避免用户误认。</p>
     <h3>版本</h3>
-    <p>v1.25.5　·　Windows 10 / 11，32 位 64 位都支持　·　单文件便携版　·　手机扫码看板</p>
+    <p>v1.25.6　·　Windows 10 / 11，32 位 64 位都支持　·　单文件便携版　·　手机扫码看板</p>
     <div class="sig">© 永远的兰兰　·　Lanlan Eternal</div>`
 },
 en:{
@@ -2130,7 +2130,7 @@ en:{
     <p class="dim">This licence grants rights to the code only. The names "TraceWisp" and "铜迹" and the icons come with no name or trademark licence (§7(e)). Please pick
        a different name if you fork and publish separately.</p>
     <h3>Version</h3>
-    <p>v1.25.5　·　Windows 10 / 11, 32-bit and 64-bit　·　portable single file　·　phone via QR</p>
+    <p>v1.25.6　·　Windows 10 / 11, 32-bit and 64-bit　·　portable single file　·　phone via QR</p>
     <div class="sig">© Lanlan Eternal　·　永远的兰兰</div>`
 }
 };
@@ -11103,6 +11103,9 @@ function toggleLayers(){
 function toggleLang(){
   lang = (lang==="zh") ? "en" : "zh";
   try{ localStorage.setItem("copperlens.lang", lang); }catch(_){}
+  /* exe 里 localStorage 靠不住（每次启动都是新端口、新 origin），同时写进本机
+     store.json，下次启动由服务端注入 window.__LANG0__。网页版这一步是空转。 */
+  try{ kvSet("copperlens.lang", lang); }catch(_){}
   applyLang();
   // 状态栏里现在那串标签是上一个语言写的，重新生成一遍
   if(LIT) updateStatus(curHit);
@@ -12294,7 +12297,10 @@ resize();
 /* 语言：优先用上次选过的；没选过就跟系统语言走（非中文系统默认英文）。
    必须在载入板子之前定下来，状态栏第一行才不会闪一下中文。 */
 try{
-  const sv=localStorage.getItem("copperlens.lang");
+  /* 顺序有讲究：__LANG0__ 是服务端在 <head> 里注进来的（exe 下读自 store.json），
+     同步就有值 —— 用它才不会先按系统语言渲染一遍再切。
+     这里不能改用 kvGet：它依赖 `const KV`，那个变量在几千行之后才初始化，此刻读会撞 TDZ。 */
+  const sv=window.__LANG0__ || localStorage.getItem("copperlens.lang");
   if(sv==="zh"||sv==="en") lang=sv;
   else if(!/^zh/i.test(navigator.language||"")) lang="en";
 }catch(_){}

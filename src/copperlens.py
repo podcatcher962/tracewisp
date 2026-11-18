@@ -48,7 +48,7 @@ from ctypes import wintypes
 from pathlib import Path
 
 APP_TITLE = "铜迹 TraceWisp"
-VERSION = "1.25.5"
+VERSION = "1.25.6"
 
 # 认自己窗口时看的标题关键词。改名之前/之后都收，老用户的更新包不会认不到自己的窗口。
 _SELF_TITLES = ("铜迹", "TraceWisp", "CopperLens", "PCB 看板")
@@ -1212,6 +1212,16 @@ def build_home_html(token, remote=False, lan=None):
     if lan:
         parts.append("window.__LAN__=%s" % json.dumps(
             lan, ensure_ascii=False, separators=(",", ":")))
+    if not remote:
+        # 界面语言也落 store.json。前端启动时同步读到它，才不会先按系统语言
+        # 渲染一遍中文、再切回去（那个闪一下比记不住更难受，也比记不住更容易被当成卡）。
+        # 手机那侧不给：它连的是本机服务，用户可能想让手机跟自己的系统语言走。
+        try:
+            _l0 = _kv_load().get("copperlens.lang")
+            if _l0 in ("zh", "en"):
+                parts.append("window.__LANG0__=%s" % json.dumps(_l0))
+        except Exception:
+            pass
     inject = "<script>" + ";".join(parts) + ";</script>"
     return tpl.replace("</head>", inject + "</head>", 1).encode("utf-8")
 

@@ -114,6 +114,28 @@
 （越靠边越快，松手就停）；放大后**左上角缩略图**里的黄框是当前视野，点一下跳过去；
 板上**右键写一句话**就是一条标记，按板子存档。
 
+## v1.25.6 界面语言也记住了
+
+**格式、解析、渲染一行没动。**
+
+上一版把「板上标记」和「档案」挪进了本机文件，当时留了一条尾巴：界面语言还是按
+端口存的，exe 每次启动都换端口，所以切成英文、关掉、再打开又回中文。
+
+现在语言也一起存进 `%LOCALAPPDATA%\CopperLens\store.json`（同一个文件，同一个通道），
+下次打开直接就是上次选的语言，不会先按系统语言闪一遍中文再切。
+
+顺带说明：手机连进来的那一侧不读这台电脑的语言设置，跟自己的系统语言走。
+
+### 实测
+
+- 服务端 4 项：没存过不注入、写了会注入、值是合法 JSON、手机侧不注入
+- 页面 5 项（真浏览器 + 真写盘通道）：存 `en` → 重新加载就是英文；点按钮切中文 →
+  store.json 里那个键真的变了；再加载仍是中文；清掉 → 回落系统语言
+- 真机两轮：写 `en` 起 exe，界面全英文（Open File / Trace a net / Continuity）；
+  写 `zh` 起 exe，界面全中文（打开文件 / 查线 / 通断 / 量距）
+
+---
+
 ## v1.25.5 手机上「全都小得看不清」，问题不在字号
 
 **格式、解析、渲染一行没动。** 这一版只改触屏下的界面尺寸和手势，桌面窗口的尺寸一个没改。
@@ -1219,6 +1241,33 @@ Mouse: the wheel zooms **anchored at the pointer**; **drag to the edge of the ca
 view keeps moving that way** (faster the closer you get, stops when you let go); once zoomed
 in, the **mini-map in the top-left** shows your viewport as a yellow box — click to jump;
 **right-click on the board writes a note**, saved per board.
+
+## What's new in v1.25.6 — the interface language is remembered too
+
+**Formats, parsing and rendering untouched.**
+
+The previous release moved board marks and log entries into a local file, and left one
+loose end: the interface language was still stored per-origin. The exe opens a random port
+on every start, so switching to English, closing and reopening put you back in Chinese.
+
+The language now lives in the same `%LOCALAPPDATA%\CopperLens\store.json` through the same
+channel, and it is injected into the page before the first paint — so the window opens in
+the language you chose instead of rendering Chinese and switching a moment later.
+
+The phone view does not read the desktop's language setting; it follows the phone's own
+system language.
+
+### What was actually tested
+
+- Server, 4 checks: nothing injected before a language is saved, injected afterwards,
+  the value is valid JSON, and the phone view never gets it
+- Page, 5 checks (real browser, real write path): saving `en` then reloading gives English;
+  clicking the toggle switches to Chinese and **the key really changes on disk**;
+  reloading again stays Chinese; clearing the key falls back to the system language
+- Real exe, two rounds: with `en` on disk the UI is all English (Open File / Trace a net /
+  Continuity / Measure); with `zh` it is all Chinese
+
+---
 
 ## What's new in v1.25.5 — "everything is tiny on my phone" was not a font-size problem
 
